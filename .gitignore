@@ -9,7 +9,6 @@ build_local/
 *.tar.gz
 errorlog
 adpdev/.stayalive
-setenv.sh
 .DS_Store
 *.zip
 *.tar.gz
