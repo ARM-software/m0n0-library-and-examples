@@ -1,0 +1,14 @@
+Testcase_Enum                     Testcase_Function
+NONE                              empty_test
+INITIALISATION                    empty_test
+WAIT_FOR_ADP                      empty_test
+HELLO                             print_hello
+EN_D_SLEEP                        enable_deep_sleep
+DISABLE_D_SLEEP                   disable_deep_sleep
+CALL_WFI                          call_wfi
+UPDATE_PERF                       update_sw_perf
+ECHO_STDIN                        echo_stdin
+SANITY_TC                         tc_sanity
+AES_TC                            tc_aes
+RTC_TC                            tc_rtc
+PERF_TC                           tc_perf

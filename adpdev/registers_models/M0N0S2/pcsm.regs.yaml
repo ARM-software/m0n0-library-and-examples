@@ -1,0 +1,372 @@
+data_bits: 24
+registers:
+  0x0: 
+    name: "pcsm_ctrl"
+    por: 0
+    description: "PCSM Configuration bits"
+    internal: True
+    notes: "Exists in RTL but no actual purpose"
+  0x1:
+    name: "rtc_ctrl0"
+    por: 0x394B60
+    description: ""
+    bit_groups:
+      - name: "trim_local_reg_tune"
+        msb: 9
+        lsb: 4
+        description: "Tune VDD_LOCAL"
+      - name: "trim_cap_tune"
+        msb: 13
+        lsb: 10
+        description: "Tune capacitor array"
+      - name: "trim_res_tune"
+        msb: 22
+        lsb: 14
+        description: "Tune resistor array"
+      - name: "trim_en_tribuf"
+        bit: 23
+        internal: True
+        description: "enable a tri-state buffer that controls N-well of resistors"
+        notes: "Experimental feature not exposed to users"
+  0x2: 
+    name: "rtc_ctrl1"
+    por: 0x000027
+    description: ""
+    bit_groups:
+      - name: "en_switchcap"
+        bit: 1
+        internal: True
+        description: "enable/disable sc_by2"
+        notes: "Not for user control, increases power"
+      - name: "en_fbb"
+        bit: 3
+        description: "Enable FBB to improve oscillator temperature stability"
+  0x3: 
+    name: "mem_ctrl"
+    por: 0x00C0B2 
+    description: "Memory control bits"
+    bit_groups:
+      - name: "shram_retxd0"
+        bit: 0
+        internal: True
+        description: "Shutdown RAM retention setting (bit 0 of 2 bit value - hidden from external use)"
+      - name: "shram_retxd"
+        bit: 1
+        description: "Shutdown RAM retention setting"
+        value_table:
+          0: "Conservative, maximum retention margin with 1.2x chip shutdown leakage increase"
+          1: "Default, minimum shutdown leakage"
+      - name: "ROM_DebugP"
+        msb: 15
+        lsb: 4
+        internal: True
+        description: "Shared by all instances"
+        notes: "Experimental feature with working default"
+  0x4:
+    name: "io_ctrl"
+    por: 0x1E20 
+    description: "VBAT IO control"
+    bit_groups: 
+      - name: "DS_vbat_inputs"
+        lsb: 0
+        msb: 1
+        description: "DS1/0 (drive) on VBAT input pads"
+        internal: True
+        notes: "Extra drive strength on input pads does nothing but waste leakage"
+      - name: "DS_vbat_outbidir"
+        lsb: 4
+        msb: 5
+        description: "Drive strength on VBAT output/bidir pads"
+        value_table:
+          0: "2mA max output current"
+          1: "4mA max output current"
+          2: "8mA max output current"
+          3: "12mA max output current"
+      - name: "SR_vbat_outbidir"
+        bit: 6
+        description: "Limit slew rate on VBAT output/bidir pads"
+      - name: "expose_pcsm_write"
+        bit: 8
+        description: "Enable visibility of internal SPI transfers to PCSM on MOSI pad. Incurs additional IO power if left enabled"
+      - name: "spi_cs_polarity"
+        msb: 11
+        lsb: 9
+        description: "{SS2, SS1, SS0}: 0=active high, 1=active low"
+      - name: "ivr_enable"
+        bit: 12
+        internal: True
+        description: "Enable use of internal switch-mode power supply"
+        notes: "Not a user feature. This allows us to measure performance/power from external VREG but prevents DVFS"
+  0x5: 
+    name: "rtc_wkup0"
+    por: 0
+    description: "24 LSBs of timed-shutdown wakeup timer, counted on 33kHz RTC clock. Triggers a wake from shutdown after this interval. Must be zero for shutdown entry."
+  0x6: 
+    name: "rtc_wkup1"
+    por: 0
+    description: "20 MSBs of timed-shutdown wakeup timer. Must be zero for shutdown entry."
+  0x7:
+    name: "ivr_ctrl0"
+    por: 0x31004E
+    description: "iVR gen1 control bits"
+    internal: True
+    notes: "We can potentially consult on settings for alternate BOMs but dont want to have to document all the ins and outs of this"
+    bit_groups:
+      - name: "ipeak"
+        lsb: 0
+        msb: 5
+        description: "sets the peak current of the pattern generation in PFM mode, ipeak[5:0] MUST be higher than istop[5:0] at any time"
+      - name: "istop"
+        lsb: 6
+        msb: 11
+        description: "sets the zero current turn-off of the pattern generation in PFM mode, istop[5:0] MUST be lower than ipeak[5:0] at any time"
+      - name: "dvs_speed"
+        lsb: 12
+        msb: 16
+        description: "sets the DVS speed ramp speed division ratio, i.e. a higher value of dvs_speed[4:0] yields a slower ramp"
+      - name: "d_ivr_rdy_timed_ena"
+        bit: 18
+        descrption: "set the iVR ready flag in timed mode, i.e. the iVR ready flag will be turned high a fixed timed after enabling the iVR irrespective of the output voltage"
+      - name: "d_isns_gain_x2"
+        bit: 19
+        description: "double the gain of the current sense amplifier of hte current mode modulator (continuous conduction mode only)"
+      - name: "d_ena_slc"
+        bit: 20
+        description: "Enable the slope compensation of the current mode modulator (continuous conduction mode only)"
+      - name: "d_autocal_ena"
+        bit: 21
+        description: "enable the auto calibration of the offsets of most analog blocks at the first start-up after PoR"
+      - name: "d_clkdiv_ena"
+        bit: 22
+        description: "enable the clock division algorithm that automatically divide the sampling frequency at low load"
+      - name: "d_force_pfm"
+        bit: 23
+        description: "force the iVR to operate in PFM mode only and deactivate the fast transient continuous conduction mode"
+  0x8:
+    name: "ivr_ctrl1"
+    por: 0x000F07
+    internal: True
+    description: "iVR gen1 control bits"
+    bit_groups:
+      - name: "ccmosc_tune"
+        lsb: 0
+        msb: 3
+        description: "Sets the frequency of the CCM oscillator (MHz) - default is 3.2 MHz"
+        value_table:
+          0: 11.33
+          1: 9.48
+          2: 8.698
+          3: 7.014
+          4: 5.88
+          5: 4.59
+          6: 3.975
+          7: 3.266
+          8: 2.772
+          9: 2.206
+          10: 1.885
+          11: 1.599
+          12: 1.385
+          13: 1.195
+          14: 1.195
+          15: 1.05
+          16: 0.917
+  0x9:
+    name: "amso_ctrl"
+    por: 0
+    description: "AMSO pad test mux control"
+    bit_groups:
+      - name: "tmux_sel"
+        lsb: 0
+        msb: 7
+        description: "Other values expose unsupported internal signals"
+        value_table:
+          0: "No signal selected"
+#Commented are all arm-internal settings that are meaningless to users
+#          1: "d_ccm_comp"
+#          2: "d_dcm_vco"
+#          3: "ccm_osc_int"
+#          4: "d_tdc_dll[0]"
+#          5: "d_tdc_dll[1]"
+#          6: "d_tdc_ton_ref"
+#          7: "d_tdc_lvdtct"
+#          8: "d_rdy"
+#          9: "d_ena_tdc"
+#          10: "d_tdc_clk"
+#          11: "d_ena_ccmloop"
+#          12: "d_ena_ccmosc"
+#          13: "d_ena_dcmisns"
+#          14: "d_dcm_muxselect"
+#          15: "trim_ready"
+#          16: "rs_state[0]"
+#          17: "rs_state[1]"
+#          18: "rs_state[2]"
+#          19: "rs_state[3]"
+#          20: "rs_state[4]"
+          21: "132kHz (pre-divider) RTC output clock, visible in active modes only. Can be used to trim RTC"
+#          22: "trim_opacomp_rdy"
+#          23: "trim_iloopcomp_rdy"
+#          24: "trim_opaslc_rdy"
+#          25: "clk_slow_ena"
+#          26: "pfm_mode"
+#          27: "pwm_mode"
+#          28: "d_trim_opacomp_sign"
+#          29: "d_trim_opaslc_sign"
+#          30: "d_por"
+          31: "Battery monitor under-voltage output. Can be used to trim battery monitor"
+          32: "Battery monitor over-voltage output. Can be used to trim battery monitor"
+#          33: "ivr_rdy_logic"
+#          34: "ivr_rdy_logic_force_pfm"
+#          35: "ivr_rdy_timed"
+  0xB:
+    name: "batmon_ctrl"
+    por: 0x33
+    description: "Batmon control bits"
+    bit_groups:
+      - name: "d_uvlo_copy"
+        msb: 1
+        lsb: 0
+      - name: "d_uvlo_ladder"
+        msb: 5
+        lsb: 2
+  0xC: 
+    name: "code_ctrl"
+    por: 0x100
+    description: "Memory remap + ROM dynamic power gating enable + ROM dynamic power gating delay"
+    bit_groups:
+      - name: "memory_remap"
+        msb: 1
+        lsb: 0
+        description: "Remaps memory base address zero where CPU will always fetch code on wake/reset"
+        value_table:
+          0: "Mapped to ROM"
+          1: "Mapped to DEVRAM (DEVRAM content on VDEV supply persists through shutdown)"
+          2: "Mapped to CODERAM (CODERAM content on VREG supply is lost on shutdown)"
+
+      - name: "rom_pwr_gate_bypass"
+        bit: 2
+        internal: True
+        description: "Disable dynamic ROM power gating. Relies on correct software management of ROM power gates and isolation."
+        notes: "Do not expect users to need this as it works in our experience across advertised PVT range"
+      - name: "rom_pwr_on_delay"
+        msb: 8
+        lsb: 3
+        description: "Number of system clocks to wait after powering up a ROM bank. Modification will require verification across PVT conditions"
+  0x11:
+    name: "tcro_ctrl"  
+    por: 0x1C 
+    description: "Tuned clock ring oscillator setting. Lower is generally faster. Can be safely written by SW but is only applied on next DVFS-up or wake from shutdown. Does not change voltage, but IVR delay line shares some bits."
+  0x1B:
+    name: "perf_ctrl"
+    por: 0x19
+    description: "System speed target. IVR will adjust voltage based on delay line measurements. Non-linear but provided python/C code translates to linear 0-15."
+    bit_groups:
+      - name: "perf"
+        msb: 4
+        lsb: 0
+        description: "Average frequency target (MHz)"
+        value_table:
+          0x1C: 0.946
+          0x18: 1.63
+          0x1D: 2.27
+          0x14: 3.37
+          0x1E: 3.82
+          0x19: 3.98
+          0x1F: 5.44
+          0x10: 6.32
+          0x1A: 6.75
+          0x15: 8.34
+          0x1B: 9.62
+          0x16: 14.2
+          0x11: 15.64
+          0x17: 20.20
+          0x12: 26.96
+          0x13: 38.48
+  0x1E: 
+    name: "dig_clk_en"
+    por: 0xFF9E7F
+    description: ""
+    internal: True
+    notes: "Disables TCRO permanently, not a user feature"
+    bit_groups:
+      - name: "tcro_en"
+        bit: 0
+  0x1F:
+    name: "dig_nrst_en"
+    por: 0xFF9E7F
+    internal: True
+    notes: "Resets VREG/VDEV system permanently, not a user feature"
+    description: ""
+    bit_groups:
+      - name: "sysreset"
+        bit: 0
+  0x20:
+    name: "dig_pwr_en"
+    por: 0xFF9E7F
+    description: "Active mode power enable register, may be used to reduce active leakage from unused memories. Use with dig_out_en to ensure power gated outputs are isolated correctly"
+    bit_groups: 
+      - name: "shram_periph"
+        bit: 1
+        description: "Shutdown RAM periphery"
+      - name: "shram_core"
+        bit: 2
+        description: "Shutdown RAM core (loses state)"
+      - name: "dataram_periphery"
+        msb: 6
+        lsb: 3
+        description: "Data RAM periphery (by 4KB instance)"
+      - name: "coderam_periphery"
+        msb: 8
+        lsb: 7
+        description: "Code RAM periphery (by 4KB instance)"
+      - name: "data_ram_core"
+        msb: 12
+        lsb: 9
+        description: "Data RAM core (by 4KB instance)"
+      - name: "coderam_core"
+        msb: 14
+        lsb: 13
+        description: "Code RAM core (by 4KB instance)"
+      - name: "rom"
+        msb: 22
+        lsb: 15
+        description: "ROM (one bit per consecutive pair)"
+  0x21:
+    name: "dig_out_en"
+    por: 0xFF9E7F
+    description: "Enables outputs from power gated circuits controlled by dig_pwr_en. Clear associated bits before dig_pwr_en and set after dig_pwr_en."
+    bit_groups:
+      - name: "vreg_to_vreg_vbat_iso" 
+        bit: 0
+        internal: True
+        notes: "Isolates VREG outputs to VBAT and VDEV. Locks up the chip? Not useful to users"
+        description: "VREG2VBATiso, VREG2VDEViso"
+      - name: "shram_iso" 
+        bit: 1
+        description: "Shutdown RAM isolation"
+      - name: "dataram_iso"
+        msb: 6
+        lsb: 3
+        description: "Data RAM isolation (by 4KB instance)"
+      - name: "coderam_iso"
+        msb: 8
+        lsb: 7
+        description: "Code RAM isolation (by 4KB instance)"
+      - name: "rom_iso"
+        msb: 22
+        lsb: 15
+        description: "ROM isolation (one bit per consecutive pair)"
+  0x22: 
+    name: "digpwr_ao"
+    por: 0xFF9E7C
+    description: "Power enable register (shutdown mode) - Consistent bit-mapping to dig_pwr_en. Note that VREG is off in shutdown so other than Shutdown RAM (on VBAT) this only serves to turn on power gates in memories during IVR startup - or later"
+  0x23:
+    name: "inttimer0"
+    por: 0
+    description: "Looping timer value, counted on 33kHz RTC clock (Note: N+1 RTC periods). SPI can be configured to fetch a byte when this triggers. Also visible to CPU as IRQ6"
+  0x24:
+    name: "inttimer1"
+    internal: True
+    notes: "Present in RTL but unused"
+    por: 0
+    description: ""
+

@@ -1,0 +1,192 @@
+data_bits: 32
+base_addr: 0xF0003000
+reg_offset: 0x4 # cannot use data bits - i.e. PCSM vs ctrl regs
+registers:
+  0x0:
+    name: "STATUS_0"
+    read_only: True
+    description: "ROM BIST signature, computed by sequential XOR of each word. Cleared when run_bist in ctrl1 is deasserted"
+  0x1:
+    name: "STATUS_1"
+    read_only: True
+    description: "SHRAM BIST status"
+    bit_groups:
+      - name: "bist_complete"
+        bit: 0
+        description: "BIST sequence complete? Valid only while run_bist is asserted."
+        value_table:
+         0: "BIST sequence never completed since last run_bist assertion."
+         1: "BIST sequence completed at least once since last run_bist assertion."
+      - name: "bist_pass"
+        bit: 1
+        description: "BIST sequence passed? Valid only while run_bist is asserted."
+        value_table:
+         0: "BIST sequence never passed since last run_bist assertion."
+         1: "BIST sequence passed at least once since last run_bist assertion."
+      - name: "bist_fail"
+        bit: 2
+        description: "BIST sequence failed? Valid only while run_bist is asserted."
+        value_table:
+         0: "BIST sequence never failed since last run_bist assertion."
+         1: "BIST sequence failed at least once since last run_bist assertion."
+      - name: "bist_running"
+        bit: 3
+        description: "BIST sequence running?"
+        value_table:
+         0: "BIST engine in idle state."
+         1: "BIST sequence running."
+      - name: "bist_last_pass"
+        bit: 4
+        description: "Most recent BIST sequence passed? Useful for looping tests"
+        value_table:
+         0: "Last BIST sequence failed or not run."
+         1: "Last BIST sequence passed."
+      - name: "bist_errors"
+        msb: 14
+        lsb: 5
+        description: "Count of erroneous RAM word read accesses during BIST. Saturating and cumulative from reset."
+  0x2:
+    name: "STATUS_2"
+    read_only: True
+    description: "LSB of Real Time Clock"
+    bit_groups:
+      - name: "rtc_lsbs"
+        msb: 31
+        lsb: 0
+        description: ""
+  0x3:
+    name: "STATUS_3"
+    read_only: True
+    description: "LERAM 16KB BIST / 8KB BIST"
+    bit_groups:
+      - name: "bist_ever_complete_16KB"
+        bit: 0
+        description: "As for SHRAM in STATUS_0 but for low power VREG data RAM"
+      - name: "bist_ever_passed_16KB"
+        bit: 1
+        description: "As for SHRAM in STATUS_0 but for low power VREG data RAM"
+      - name: "bist_ever_failed_16KB"
+        bit: 2
+        description: "As for SHRAM in STATUS_0 but for low power VREG data RAM"
+      - name: "bist_running_16KB"
+        bit: 3
+        description: "As for SHRAM in STATUS_0 but for low power VREG data RAM"
+      - name: "bist_last_pass_16KB"
+        bit: 4
+        description: "As for SHRAM in STATUS_0 but for low power VREG data RAM"
+      - name: "bist_errors_16_KB"
+        msb: 14
+        lsb: 5
+        description: "As for SHRAM in STATUS_0 but for low power VREG data RAM"
+      - name: "cpu_sleeping_output"
+        bit: 15
+        description: "SLEEPING output from CPU, asserted in response to WFI instruction. See Cortex-M33 documentation for details"
+      - name: "bist_ever_complete_8KB"
+        bit: 16
+        description: "As for SHRAM in STATUS_0 but for low power VREG code RAM"
+      - name: "bist_ever_passed_8KB"
+        bit: 17
+        description: "As for SHRAM in STATUS_0 but for low power VREG code RAM"
+      - name: "bist_ever_failed_8KB"
+        bit: 18
+        description: "As for SHRAM in STATUS_0 but for low power VREG code RAM"
+      - name: "bist_running_8KB"
+        bit: 19
+        description: "As for SHRAM in STATUS_0 but for low power VREG code RAM"
+      - name: "bist_last_pass_8KB"
+        bit: 20
+        description: "As for SHRAM in STATUS_0 but for low power VREG code RAM"
+      - name: "bist_errors_8KB"
+        msb: 30
+        lsb: 21
+        description: "As for SHRAM in STATUS_0 but for low power VREG code RAM"
+      - name: "cpu_lockup_output"
+        bit: 31
+        description: "LOCKUP output from CPU. See Cortex-M33 documentation for details"
+  0x4:
+    name: "STATUS_4"
+    read_only: True
+    description: "MSB of real time clock"
+    bit_groups:
+       - name: "rtc_msbs"
+         msb: 11
+         lsb: 0
+  0x5:
+    name: "STATUS_5"
+    read_only: True
+    description: "ROM BIST status"
+    notes: "AES LBIST appears to not be fully functional so we wont offer to users"
+    bit_groups:
+      - name: "lbist_running"
+        bit: 0
+        description: "As for SHRAM in STATUS_0 but for AES"
+        internal: True
+      - name: "lbist_complete"
+        bit: 1
+        description: "As for SHRAM in STATUS_0 but for AES"
+        internal: True
+      - name: "pass"
+        bit: 2
+        description: "As for SHRAM in STATUS_0 but for ROM"
+      - name: "fail"
+        bit: 3
+        description: "As for SHRAM in STATUS_0 but for ROM"
+      - name: "complete"
+        bit: 4
+        description: "As for SHRAM in STATUS_0 but for ROM"
+      - name: "running"
+        bit: 5
+        description: "As for SHRAM in STATUS_0 but for ROM"
+  0x7:
+    name: "STATUS_7"
+    read_only: True
+    bit_groups:
+      - name: "deve_core"
+        bit: 0
+        description: "DEVE input from VBAT padring, which unclamps VDEV interface. Checked by SW to suppress debug features such as printf that will fail in absence of VDEV"
+      - name: "batmon_refrdy"
+        bit: 1
+        description: "Indicates low power voltage reference in battery monitor has stabilised. Over/under voltage outputs and POR are suppressed until asserted"
+      - name: "batmon_under"
+        bit: 2
+        description: "Indicates VBAT supply is presently too low for correct operation"
+      - name: "batmon_over"
+        bit: 3
+        description: "Indicates VBAT supply is presently too high. May affect long term reliability, system power, and system/RTC clock accuracy"
+      - name: "perf"
+        msb: 8
+        lsb: 4
+        description: "Mirrors PCSM perf_ctrl register. See PCSM table for details"
+      - name: "ivr_rdy"
+        bit: 9
+        internal: True
+      - name: "real_time_flag"
+        bit: 10
+        description: "Indicates that RTC count has been continuous since last POR. Entry into shutdown mode pauses RTC and clears this flag (but not timed-shutdown)"
+      - name: "ext_wake"
+        bit: 11
+        description: "EXTWAKE input from VBAT padring"
+      - name: "io_ctrl_8"
+        bit: 12
+        description: "Bit 8 of PCSM io_ctrl register. See PCSM table for details"
+      - name: "io_ctrl_12"
+        bit: 14
+        internal: True
+        description: "Bit 12 of PCSM io_ctrl register. See PCSM table for details"
+        note: "Disables IVR for off-chip VREG delivery. Not a user feature!"
+#      - name: "code_ctrl"
+#        lsb: 16
+#        msb: 24
+#        description: "9 LSBs of PCSM code_ctrl register. See PCSM table for details"
+      - name: "memory_remap"
+        lsb: 16
+        msb: 17
+        description: "For reading memory remap status (see PCSM code_ctrl register for details)"
+      - name: "rom_power_gating_bypass"
+        bit: 18
+        internal: True
+      - name: "rom_wakeup_delay"
+        msb: 24
+        lsb: 19
+        description: "The number of cycles of delay to wait for a ROM bank to power-on."
+

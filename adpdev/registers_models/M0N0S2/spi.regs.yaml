@@ -1,0 +1,87 @@
+data_bits: 32
+base_addr: 0xB8000000
+reg_offset: 0x4 # cannot use data bits - i.e. PCSM vs ctrl regs
+registers:
+  0x0:
+    name: "status"
+    por: 0
+    description: "Status Register (0=not busy,1=busy)"
+  0x1:
+    name: "command"
+    por: 0
+    description: "Set wait, write and read commands"
+    bit_groups:
+      - name: "command"
+        msb: 1
+        lsb: 0
+        description: ""
+        value_table:
+          0: "wait"
+          1: "write"
+          2: "read"
+  0x2:
+    name: "data_write"
+    por: 0
+    description: ""
+  0x3:
+    name: "data_read"
+    por: 0
+    description: ""
+  0x4:
+    name: "clk_divide"
+    por: 0x4
+    description: "Sets divider ratio for SPI output clock versus variable system clock. Will depend upon SPI chip limits and user DVFS settings"
+  0x5:
+    name: "control"
+    por: 0x8700
+    description: ""
+    bit_groups:
+      - name: "clk_polarity_phase"
+        msb: 1
+        lsb: 0
+        description: "Sets the SPI clock polarity and phase mode"
+        value_table:
+          0: "Mode 0: CPOL=0,CPHA=0"
+          1: "Mode 1: CPOL=0,CPHA=1"
+          2: "Mode 2: CPOL=1,CPHA=0"
+          3: "Mode 3: CPOL=1,CPHA=1"
+      - name: "lsb_first"
+        bit: 2
+        description: 'If "1", transfers LSB first'
+      - name: "chip_select"
+        msb: 6
+        lsb: 3
+        description: "Asserts a chip select"
+        value_table:
+          0x1: "SS0"
+          0x2: "SS1"
+          0x4: "SS2"
+          0x8: "SS3 - reserved for writes to PCSM"
+      - name: "enable_mask"
+        bit: 7
+        #description: 'Forces all chip selects to deactivate when "1"'
+        description: ''
+      - name: "cs_active_low_ss0"
+        bit: 8
+        description: 'Inverts SS0 chip select. io_ctrl PCSM register allows same function, but they can cancel out'
+      - name: "cs_active_low_ss1"
+        bit: 9
+        description: 'Inverts SS1 chip select. io_ctrl PCSM register allows same function, but they can cancel out'
+      - name: "cs_active_low_ss2"
+        bit: 10
+        description: 'Inverts SS2 chip select. io_ctrl PCSM register allows same function, but they can cancel out'
+      - name: "enable_auto_sample"
+        bit: 11
+        description: "Turns on Auto Sample"
+      - name: "auto_sample_mode"
+        bit: 12
+        description: "0:adc, 1:flash chip"
+      - name: "adc_byte_offset"
+        msb: 15
+        lsb: 13
+        description: "ADC data byte offset within the two bytes"
+
+  0x6:
+    name: "sensor_data"
+    por: 0
+    description: ""

@@ -1,0 +1,96 @@
+data_bits: 32
+base_addr: 0xBC000000
+reg_offset: 0x4
+registers:
+  0x0:
+    name: "data_0"
+    por: 0
+    description: "Word 0 of the data (most significant)"
+  0x1:
+    name: "data_1"
+    por: 0
+    description: "Word 1 of the data"
+  0x2:
+    name: "data_2"
+    por: 0
+    description: "Word 2 of the data"
+  0x3:
+    name: "data_3"
+    por: 0
+    description: "Word 3 of the data (least significant)"
+  0x4:
+    name: "key_0"
+    por: 0
+    description: "Key 0 (most significant)"
+  0x5:
+    name: "key_1"
+    por: 0
+    description: "Key 1"
+  0x6:
+    name: "key_2"
+    por: 0
+    description: "Key 2"
+  0x7:
+    name: "key_3"
+    por: 0
+    description: "Key 3"
+  0x8:
+    name: "key_4"
+    por: 0
+    description: "Key 4"
+  0x9:
+    name: "key_5"
+    por: 0
+    description: "Key 5"
+  0xa:
+    name: "key_6"
+    por: 0
+    description: "Key 6"
+  0xb:
+    name: "key_7"
+    por: 0
+    description: "Key 7 (least significant)"
+  0xc:
+    name: "control"
+    por: 0
+    description: "AES control register"
+    notes: |
+      Note on IRQ setting: The procedure should involve
+      1. Clear first (set [2] = 1)
+      2. Then SIMULTANEOUSLY set Enable ([1] =1) and Start ([0]=1). 
+      Otherwise potentially it can interrupt at the start as enc_dec_done is high in RTL by default.
+    bit_groups:
+      - name: "start"
+        bit: 0
+        description: "Start encryption/decryption. Always reads as 0"
+        value_table:
+          0: "NA"
+          1: "Start AES encryption/decryption"
+      - name: "irq_enable"
+        bit: 1
+        description: "Enable or disable IRQ (connected to IRQ3)"
+        value_table:
+          0: "disable IRQ"
+          1: "enable IRQ"
+      - name: "irq_clear_flag"
+        bit: 2
+        description: "Clear IRQ flag"
+        value_table:
+          0: "clear reset IRQ"
+          1: "clear IRQ flag"
+      - name: "encrypt_or_decrypt"
+        bit: 3
+        description: "Specify whether to encrypt or decrypt"
+        value_table:
+          0: "decrypt"
+          1: "encrypt"
+  0xd:
+    name: "status"
+    por: 1
+    description: "AES status register"
+    notes: |
+      0 - enc/dec started but not finished 1, - enc/dec finished (note also out pf reset this will be high even without start enc/dec)
+    bit_groups:
+      - name: "completion_flag"
+        bit: 0
+        description: "Encryption or decryption completed" 

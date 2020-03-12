@@ -1,0 +1,102 @@
+name: "system"
+base: 0x0
+size: 0x100000000
+type: "Multiple" # can be code/data/device
+submaps:
+  - name: "remap"
+    description: "Remap from either ROM or DEVRAM or CODERAM"
+    base: 0x00000000
+    #size: 0x10000000
+    size: 0x20000
+    type: "Code"
+  - name: "DEVRAM"
+    description: "Development RAM (128KB)"
+    base: 0x10000000
+#    size: 0x10000000
+    size: 0x20000
+    type: "Code"
+  - name: "DATARAM"
+    description: "Data RAM (16KB)"
+    base: 0x20000000
+#    size: 0x10000000
+    size: 0x4000
+    type: "Data"
+  - name: "SHRAM"
+    description: "Shutdown RAM (4KB)"
+    base: 0x30000000
+#    size: 0x10000000
+    size: 0x1000
+    type: "Data"
+  - name: "GPIO"
+    description: "GPIO"
+    base: 0x40000000
+    size: 0x10000000 
+    type: "Device"
+  - name: "ROM"
+    description: "ROM (128KB)"
+    base: 0x50000000
+#    size: 0x10000000
+    size: 0x20000
+    type: "Code"
+  - name: "CODERAM"
+    description: "Code RAM (8KB)"
+    base: 0x60000000
+#    size: 0x10000000
+    size: 0x2000
+    type: "Code"
+  - name: "peripherals"
+    description: "Peripherals (AES, SPI, STD)"
+    base: 0xB0000000
+    size: 0x10000000
+    type: "Device"
+    submaps:
+      - name: "SPI"
+        base: 0xB8000000
+        size: 0x1C
+        type: "Device"
+        description: "SPI interface"
+      - name: "STDOUT"
+        base: 0xB4200000
+        size: 0x00000010
+        type: "Device"
+        descriptin: "STDOUT Comms Channel FIFO Interface"
+      - name: "STDIN"
+        base: 0xB4300000
+        size: 0x00000010
+        type: "Device"
+        descriptin: "STDIN Comms Channel FIFO Interface"
+        #submaps: USE REGISTER MODEL INSTEAD FOR PERIPHERALS
+        #  status_reg:
+        #    offset: 0
+        #    size: 0x4
+        #    description: "CommandReg"
+        #  command_reg:
+        #    offset: 1
+        #    size: 0x4
+        #    description: "WaitCommand, WriteCommand ReadCommand"
+        #  data_write_reg:
+        #    offset: 2
+        #    size: 0x4
+        #    description: "DataWriteReg"
+        #  data_read_reg:
+        #    offset: 2
+        #    size: 0x4
+        #    description: "DataWriteReg"
+        #    
+      - name: "AES"
+        base: 0xBC000000
+        size: 0x38
+        type: "Device"
+        descriptin: "AES Control Registers"
+#  - name: "EBI"
+#    description: "EBI (only accessible from ADP)"
+#    base: 0xE0000000
+#    size: 0x10000000
+#    type: "Device"
+#    internal: True
+  - name: "control_regs"
+    description: "Control Registers"
+    base: 0xF0000000
+    size: 0x10000000
+    type: "Device"
+

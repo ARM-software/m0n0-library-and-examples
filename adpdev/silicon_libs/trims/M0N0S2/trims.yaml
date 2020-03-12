@@ -1,0 +1,94 @@
+chip: 
+  1:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xE5
+  2:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xE5
+  4:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xDF
+  5:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xE4
+  6:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xF0
+  7:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xE8
+  8:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xF0
+  9:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xDF
+  13:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xF8
+  14:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xE1
+
+  17:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xE3
+  22:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xE5
+  28:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xE0
+  34:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xF6
+
+  37:
+    pcsm:
+      rtc_ctrl1: 
+        en_fbb: 1
+      rtc_ctrl0:
+        trim_res_tune: 0xEC
+      

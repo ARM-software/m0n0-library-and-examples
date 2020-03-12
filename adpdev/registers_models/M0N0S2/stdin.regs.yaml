@@ -1,0 +1,61 @@
+data_bits: 32
+base_addr: 0xB4300000
+reg_offset: 0x4
+registers:
+  0x0:
+    name: "wdata"
+    por: 0
+    description: "Standard input write data"
+    write_only: True
+    bit_groups:
+      - name: "write_char"
+        msb: 7
+        lsb: 0
+        description: "STDIN character from USB"
+      - name: "WAZ"
+        msb: 31
+        lsb: 8
+  0x1:
+    name: "rdata"
+    por: 0
+    read_only: True
+    description: "Standard input read data"
+    bit_groups:
+      - name: "read_char"
+        msb: 7
+        lsb: 0
+        description: "STDIN read character"
+      - name: "RAZ"
+        msb: 31
+        lsb: 8
+  0x2:
+    name: "status"
+    por: 0
+    read_only: True
+    description: "Standard input status"
+    bit_groups:
+      - name: "rxe"
+        bit: 0
+        description: "RXE - Receive FIFO Empty"
+      - name: "txf"
+        bit: 1
+        description: "TXF - Transmit FIFO Full"
+      - name: "waz_raz"
+        msb: 31
+        lsb: 2
+        description: "WAZ/RAZ"
+  0x3:
+    name: "int_ctrl"
+    por: 0
+    description: "Standard input interrupt control"
+    bit_groups:
+      - name: "interrupt_enable"
+        bit: 0
+        description: "STDIN interrupt enable"
+      - name: "fifo_not_full"
+        bit: 1
+        description: "STDIN FIFO not full"
+      - name: "waz_raz"
+        msb: 31
+        lsb: 2
+        description: "WAZ/RAZ"

@@ -1,0 +1,125 @@
+data_bits: 32
+base_addr: 0xF0000000
+reg_offset: 0x4 # cannot use data bits - i.e. PCSM vs ctrl regs
+set_addr_offset: 0x1000
+clr_addr_offset: 0x2000
+registers:
+  0x0:
+    name: "CTRL_0"
+    por: 0x0
+    description: ""
+    bit_groups:
+      - name: "master_reset"
+        bit: 0
+        description: "CPU reset (completes any outstanding bus transaction). Recommended during extensive ADP transfers such as for DEVRAM programming. Must be cleared again for CPU to reboot"
+  0x1:
+    name: "CTRL_1"
+    por: 0x7FFF0
+    description: "ROM BIST configuration"
+    bit_groups:
+      - name: "run_bist"
+        bit: 0
+        description: "Set to begin ROM BIST. Clear to stop looping tests or to prepare for another run."
+      - name: "run_once"
+        bit: 1
+        description: "BIST will read each ROM location once and compute overall signature"
+      - name: "run_rd_loop"
+        bit: 2
+        description: "Specifies that ROM perform continuous read test"
+      - name: "run_rd_current"
+        bit: 3
+        description: "Continuously reads one location"
+        internal: True
+      - name: "last_addr"
+        msb: 18
+        lsb: 4
+        description: "Stop address or target for current mode"
+        internal: True
+  0x2:
+    name: "CTRL_2" 
+    por: 0x0
+    description: "ROM Power Gating and Isolation"
+    bit_groups:
+      - name: "ROM_PWR_STATE"
+        msb: 15
+        lsb: 0
+        description: "Power enable for each ROM 8KB bank. They turn on automatically when accessed and remain on until SW clears this register or any shutdown mode is entered."
+      - name: "ROM_ISO_STATE"
+        msb: 31
+        lsb: 16
+        description: "Output enable for ROMs under explicit power control. 0=isolated. CPU executing ROM code may lockup if this control is modified without ROM_PWR_STATE"
+  0x3:
+    name: "CTRL_3"
+    por: 0x55AA0000
+    description: "RAM BIST controls"
+    bit_groups:
+      - name: "run_coderam"
+        bit: 10
+        description: "Set to begin CODERAM BIST. Clear to stop looping tests or to prepare for another run."
+      - name: "run_shram"
+        bit: 11
+        description: "Set to begin SHRAM BIST. Clear to stop looping tests or to prepare for another run."
+      - name: "run_dataram"
+        bit: 12
+        description: "Set to begin DATARAM BIST. Clear to stop looping tests or to prepare for another run."
+      - name: "run_once"
+        bit: 13
+        description: "BIST will stop after 4 accesses to each RAM location. Otherwise will loop until stopped"
+      - name: "wr_loop"
+        bit: 14
+        description: "BIST will perform continuous write loop"
+      - name: "rd_loop"
+        bit: 15
+        description: "BIST will perform continuous read loop"
+      - name: "half_pattern"
+        msb: 31
+        lsb: 16
+        description: "Half-word to be written and read/checked, then written inverted and read/checked. Will cause failures if changed while BIST is running"
+  0x4:
+    name: "CTRL_4"
+    por: 0x00000225
+    description: "Memory read delay cycles. Some PVT points require additional bus stalls to compensate relative memory slowdown. Ignored by BIST"
+    bit_groups:
+      - name: "shram_delay"
+        msb: 3
+        lsb: 0
+        description: "Shutdown RAM read delay cycles"
+      - name: "dataram_delay"
+        msb: 7
+        lsb: 4
+        description: "Data RAM read delay cycles"
+      - name: "coderam_delay"
+        msb: 11
+        lsb: 8
+        description: "Code RAM read delay cycles"
+  0x5:
+    name: "CTRL_5"
+    por: 0x0
+    description: 'SW defined ("free" register not used for HW control). Arm ROM image defined as "Testcase Control Register" with bit mapping below'
+    bit_groups:
+      - name: "Strobe"
+        bit: 0
+        description: ""
+      - name: "testcase_id"
+        msb: 15
+        lsb: 8
+        description: ""
+      - name: "rtc_repeat"
+        msb: 31
+        lsb: 16
+        description: "Repeat testcase for RTC time - gets multiplied by 4096"
+  0x6:
+    name: "CTRL_6"
+    por: 0x0000AA50
+    description: "AES LBIST"
+    internal: True
+    bit_groups:
+      - name: "run"
+        bit: 0
+        description: ""
+      - name: "run_once"
+        bit: 1
+        description: ""
+      - name: "lbist_keydata"
+        msb: 15
+        lsb: 2

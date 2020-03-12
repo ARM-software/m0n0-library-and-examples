@@ -1,0 +1,15 @@
+CMSIS_5/*
+build/
+*.log
+*.S
+*.not
+build_local/
+*.swp
+*.swo
+*.tar.gz
+errorlog
+adpdev/.stayalive
+setenv.sh
+.DS_Store
+*.zip
+*.tar.gz

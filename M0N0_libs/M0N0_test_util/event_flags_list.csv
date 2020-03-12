@@ -1,0 +1,6 @@
+Event_Enum                                    Description
+TC_PASSED                                     Testcase_Passed
+TC_FAILED                                     Testcase_Failed
+TCS_END_ALL_PASS                              End_of_Testcases,_all_passed
+TCS_END_FAIL                                  End_of_Testcases,_fail
+PROGRAM_END                                   Program_Finished
