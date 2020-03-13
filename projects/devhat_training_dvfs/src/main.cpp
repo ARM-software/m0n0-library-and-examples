@@ -45,7 +45,7 @@ void systick_callback(void) {
 void setup_systick(void) {
     // in a function so that we can reset after "hijacking"
     //the systick for frequency measurement
-    /* TODO TASK enable the systick with 2000000 cycles and 
+    /* TODO TASK (GOAL 3) enable the systick with 2000000 cycles and 
      * setting the systick_callback as the callback function
      */
 }
@@ -59,7 +59,7 @@ int main(void) {
     sys->gpio->set_direction(0xF); // set all four GPIOs to output
     sys->gpio->write_data(0x0); // set all four GPIOs to OFF
     // setup EXTWAKE button
-    /* TODO Task: set EXTWAKE interrupt and callback function
+    /* TODO (GOAL 1): set EXTWAKE interrupt and callback function
      * Tip: use the enable_extwake_interrupt function and pass it 
      * a pointer to the button_pressed_callback function
      */
@@ -67,7 +67,6 @@ int main(void) {
     RTCTimer timer; // timer for "realtime" reference
     timer.set_interval_ms(1500);
     timer.reset();
-    // setup SYSTICK
     setup_systick();
     while (1) {
         if (timer.check_interval()) {
@@ -75,7 +74,7 @@ int main(void) {
             sys->log_info("==============");
         }
         if (sys->is_extwake()) { // displays current freq just before change
-            /* TODO TASK: print the current perf and the estimated TCRO
+            /* TODO (GOAL 2): print the current perf and the estimated TCRO
              * frequency. TIP: see the `sys->get_perf' function and 
              * sys->estimate_tcro function
              */
@@ -90,7 +89,7 @@ int main(void) {
                 new_dvfs = current_dvfs + 1; 
             }
             sys->log_info("Old DVFS: %d, new DVFS: %d", current_dvfs, new_dvfs);
-            /* TODO Task: set the new perf*/
+            /* TODO (GOAL 4): set the new perf*/
         }
     }
     sys->log_info("Ending program"); // shouldn't reach this

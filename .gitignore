@@ -1,7 +1,6 @@
 CMSIS_5/*
 build/
 *.log
-*.S
 *.not
 build_local/
 *.swp

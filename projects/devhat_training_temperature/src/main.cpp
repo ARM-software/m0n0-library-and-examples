@@ -66,7 +66,7 @@ int main(void) {
     sys->set_recommended_settings();
     sys->log_info("Starting temperature example"); 
     uint32_t interval_ms = 2000;
-     // Detect whether this is the first run or not
+    // Detect whether this is the first run or not
     // I.e. whether there is existing data to be restored
     if (!sys->is_vbat_por()) {
         // Restore data from shram
@@ -84,7 +84,7 @@ int main(void) {
         // RTCTimer object (see README.md and the devhat_example_temperature
         // project. 
         sys->log_info("TODO: read and report temperature");
-        sys->sleep_ms(interval_ms*1000); // try using RTCTimer instead of this
+        sys->sleep_ms(interval_ms); // try using RTCTimer instead of this
     }
     sys->log_info("Ending program"); // shouldn't reach this
 }
