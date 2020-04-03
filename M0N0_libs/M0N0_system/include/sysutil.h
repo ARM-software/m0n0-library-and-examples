@@ -35,6 +35,11 @@ extern "C" {
     #include "m0n0_defs.h"
 }
 
+/**
+@file
+@brief Defines components of the M0N0_System and system utilities
+*/
+
 typedef uint32_t (*Read_Driver_Func)(uint32_t);
 typedef void (*Write_Driver_Func)(uint32_t, uint32_t);
 typedef uint32_t (*Read_BG_Driver_Func)(uint32_t, uint32_t);
@@ -130,7 +135,7 @@ class RegClass {
          *     specific bit-group of a register using a specified mask.  
          * @param error_function A pointer to a function for logging an 
          *     logging an error message and halting execution
-         * @param A pointer to a function for displaying debug text output
+         * @param debug_function A pointer to a function for displaying debug text output
          */
         RegClass(
                 uint32_t base_address,
@@ -287,6 +292,35 @@ class SPIClass : public RegClass {
 
 class GPIOClass : public RegClass {
     public:
+        /** 
+         * Constructor for GPIOClass (calls RegClass constructor)
+         *
+         * @param base_address Base address of the register/memory in the 
+         *     memory map
+         * @param add_offset whether the addresses passed to the read/write 
+         *     functions is the absolute address (add_offset=False) or 
+         *     whether it needs to be added to the base_address 
+         *     (add_offset=True). Typically, for a register
+         *     this value is False (and the absolute address passed) and 
+         *     for memories it is True. 
+         * @param size The size of the register or memory (in bytes)
+         * @param read_or_write Specify whether the register or memory is
+         *     read-only write-only, or read-and-write, using the 
+         *     MEM_RD_WR_t enum. 
+         * @param read_driver A pointer to a function for reading a whole 
+         *     register 
+         *     or memory location. 
+         * @param write_driver A pointer to a function for writing a whole
+         *     register or memory location.
+         * @param read_bg_driver A pointer to a function for reading from a
+         *     specific bit-group (or "bit range") of a register using a 
+         *     supplied mask. 
+         * @param write_bg_driver A pointer to a function for writing to a 
+         *     specific bit-group of a register using a specified mask.  
+         * @param error_function A pointer to a function for logging an 
+         *     logging an error message and halting execution
+         * @param debug_function A pointer to a function for displaying debug text output
+         */
         GPIOClass(
                 uint32_t base_address,
                 bool add_offset,
@@ -408,8 +442,9 @@ class RTCTimer {
          */
         void wait_lp();
         /**
-         * In addition to reducing the DVFS level, it Uses the PCSM interrupt
-         *  timer ("loop timer") to wait for the specified time
+         * In addition to reducing the DVFS level, it uses the PCSM interrupt
+         *  timer ("loop timer") to wait for the specified time (putting the
+         * CPU into a lower-power WFI state). 
          */
         void wait_lp_inttimer();
 };
@@ -417,8 +452,12 @@ class RTCTimer {
 class AESClass : public RegClass {
     using RegClass::RegClass;
     public:
+        /**
+         * Set the encryption/decryption key
+         *
+         * @param key Eight-element array of uint32_t type. 
+         */
         void set_key(uint32_t key[8]);
-        uint32_t* get_key(uint32_t res[8]);
         /**
          * Encrypt data (and wait for result)
          *
@@ -443,8 +482,9 @@ class AESClass : public RegClass {
                 uint32_t* data,
                 const uint32_t data_size,
                 uint32_t* result);
-        void encrypt_irq(const uint32_t* data, const uint32_t data_size);
-        void decrypt_irq(const uint32_t* data, const uint32_t data_size);
+        // Interrupt-driven AES not supported by these libs:
+        //void encrypt_irq(const uint32_t* data, const uint32_t data_size);
+        //void decrypt_irq(const uint32_t* data, const uint32_t data_size);
     private:
         void _write_data(const uint32_t* data);
         void _read_data(uint32_t* res);
@@ -459,24 +499,76 @@ class AESClass : public RegClass {
 };
 
 
-// A circular buffer that can be stored in SHRAM
+/** An implementation of a circular buffer with configurable behaviour and 
+ *  built-in support for saving to, and restoring from, Shutdown RAM (SHRAM)
+ */
 class CircBuffer {
     private:
-        uint16_t _head; // only 15 bits saved and restored
-        uint16_t _tail; // only 15 bits saved and restored
+        /** Head pointer. Only 15 bits saved/restored to/from SHRAM
+        */
+        uint16_t _head;
+        /** Tail pointer. Only 15 bits saved/restored to/from SHRAM
+         */
+        uint16_t _tail;
+        /** Size of the buffer (maximum capacity, not the current occupancy)
+         */
         uint16_t _size;
+        /** Pointer to the array used for storing the data
+         */
         uint32_t* _buffer;
+        /** Flag indicating whether the buffer is currently full
+         */
         bool _full;
+        /** Relative SHRAM address at which to save to/restore from in SHRAM
+         *  (where 0 represents the first word in SHRAM). 
+         */
         uint32_t _shram_address;
-        // if _allow_overwrite is set, the buffer will always append, 
-        // overwriting old data is full
+        /** If _allow_overwrite is set, the buffer will always append, 
+         *  overwriting old data if the buffer is full 
+         */
         bool _allow_overwrite;
+        /** Function pointer to callback to call when the buffer is full and
+         *  data is written to it. 
+         */
         Handler_Func _full_error_callback;
+        /** Function pointer to callback to call when the buffer is empty
+         */
         Handler_Func _empty_error_callback;
+        /** Function pointer to callback to call if a read error is occurs
+         */
         Handler_Func _read_error_callback;
+        /** Total number of times data has been appended, irrespective of 
+         *  how much data has been removed. 
+         */
         uint32_t _total_appends;
+        /** (currently unused)
+         */
         uint32_t _total_removes;
     public:
+        /** CircBuffer Constructor
+         *
+         * @param array Pointer to array in which to store the buffer content
+         * @param size The size of the array (number of elements) 
+         * @param shram_address The (SHRAM relative) address at which to 
+         *     save/restore the buffer in SHRAM
+         * @param allow_overwrite Whether to overwrite old data when 
+         *     appending to a full buffer. If set, an append always succeeds
+         *     (returning TRUE) and the full_error_func callback will not
+         *     be called. 
+         * @param full_error_func Pointer to a callback function to execute if
+         *     the buffer is full and append is called (only called if 
+         *     allow_overwrite is FALSE). Pass NULL to not set a callback 
+         *     function. If the buffer is full and allow_overwrite is FALSE
+         *     then the append function returns FALSE (to the calling software
+         *     can wait). If this callback is not FALSE, then the callback 
+         *     function is first called. 
+         * @param empty_error_func A pointer to a function to call when 
+         *     remove is called and the buffer is empty. Pass NULL to not 
+         *     set a callback function.
+         * @param read_error_func A point to a function to call if an 
+         *     unexpected read error occurs. Pass NULL to not set a callback
+         *     function. 
+         */
         CircBuffer(
                 uint32_t* array = NULL,
                 uint32_t size = 0,
@@ -485,19 +577,60 @@ class CircBuffer {
                 Handler_Func full_error_func = NULL,
                 Handler_Func empty_error_func = NULL,
                 Handler_Func read_error_func = NULL);
+        /** Re-initialises the CircBuffer
+         */
         void reset(void);
+        /** Checks whether the buffer is empty
+         *
+         * @return TRUE if the buffer is empty. 
+         */
         bool is_empty(void);
+        /** Checks whether the buffer is full
+         *
+         * @return TRUE if the buffer is full. 
+         */
         bool is_full(void);
+        /** Maximum size of the buffer (i.e. length of array used to hold the buffer)
+         *
+         * @return Total number of elements (occupied or unoccupied) in the buffer
+         */
         uint32_t get_capacity(void);
+        /** Current length of the buffer
+         *
+         * @return The number of currently occupied elements in the buffer
+         */
         uint32_t get_length(void);
+        /** Append data to the buffer
+         *
+         * @param item A word of data to append
+         * @return TRUE if successful (i.e. if buffer is not full, or if both
+         *     the buffer is full but allow_overwrite is TRUE. 
+         */
         bool append(uint32_t item);
+        /** Remove data to the buffer
+         *
+         * @param data Pointer to variable in which to store the result
+         * @return TRUE if remove successful (i.e. buffer not empty)
+         */
         bool remove(uint32_t* data);
-
+        /** Obtain the total number of appends to the buffer (irrespective of
+         *  how many removes). 
+         *
+         * @return The total number of appends
+         */
         uint32_t get_total_appends(void);
-//        uint32_t get_total_removes(void);
+        /** A (non-destructive) read of a specific position in the buffer
+         *
+         * @param position Position of buffer item, relative to tail
+         * @param data Pointer to variable in which to store the result
+         * @return TRUE if the read succeeded. 
+         */
         bool read(uint32_t position, uint32_t* data);
-
+        /** Save the buffer to SHRAM (address passed to constructor)
+         */
         void store_to_shram();
+        /** Loads the buffer from SHRAM (address passed to constructor)
+         */
         void load_from_shram();
 
         /**
@@ -507,6 +640,9 @@ class CircBuffer {
          * appended, and the last element is the last element appended. 
          * Only contains present elements in the array and the length is 
          * therefore the number of occupied elements. 
+         *
+         * @param array Pointer to array in which to store the result (must
+         *     be the same length as the buffer size. 
          *
          * @note This function is relatively expensive. 
          */
@@ -527,10 +663,9 @@ class CircBuffer {
         /** Prints in a format suited for ADP
          */
         void send_via_adp(void);
-
         /** Prints the array of present values
          *
-         * Prints the array of present values (length of the array is the
+         * Prints the array of present values (length of the array is 
          * the number of inserted items, not the length of the buffer). 
          * Uses the to_array function.
          *
@@ -541,6 +676,9 @@ class CircBuffer {
          * 
          * Gets the sample number of the item at a particular 
          * index in the buffer (uses the total_appends count)
+         *
+         * @param position Position of element in buffer (relative to tail)
+         * @return The sample count (using total number of appends)
          */
         uint32_t get_sample_count(uint32_t position);
 };

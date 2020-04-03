@@ -37,12 +37,26 @@ _unused_string = 'RESERVED'
 HTML_TAB = '&nbsp;&nbsp;'
 
 class Registers_Model:
+    """Loads register definitions from a YAML file, allows read/write interface with a model of the register, and allows register data to be viewed or exported. Read and write drivers can be set to enable the register models to be used to read/write to a real device over any interface. 
+    
+    :param reg_config: Path to the register definition file in YAML format
+    :type reg_config: str
+    :param logger: The logger object for logging messages to the console
+                   and file
+    :type logger: logging.Logger object
+    :param filter_internal: If true (default), it removes all registers or bit
+                            groups marked as internal (as they may cause
+                            damage to a device if used incorrectly). 
+    :type filter_internal: bool, optional
+    """
     def __init__(self, reg_config, logger=None, filter_internal=True):
+        """Constructor
+        """
         self._logger = logger or logging.getLogger(__name__)
         self._logger.debug('Creating register model with "{}"'.format(
                 reg_config))
         self._reg_config_name = reg_config
-        self.__regs = None
+        self._regs = None
         self.__table_colour_head = 'ArmBlue'
         self.__table_colour_l1 = 'white'
         self.__table_colour_l2 = 'ArmLightGray'
@@ -61,20 +75,12 @@ class Registers_Model:
             validate = True
             import yaml
             validate = False
-            #try:
-            #    import jsonschema
-            #except ModuleNotFoundError:
-            #    validate= False 
-            #schema = ""
-            #with open('reg_model_schema.yaml', 'r') as f:
-            #    schema = yaml.safe_load(f)
-            #f.closed
             with open(reg_config, 'r') as f:
                 temp = yaml.safe_load(f)
                 if validate:
                     jsonschema.validate(temp,schema)
-                self.__regs = temp['registers']
-                self.__data_bits = temp['data_bits']
+                self._regs = temp['registers']
+                self._data_bits = temp['data_bits']
                 if 'base_addr' in temp:
                     self._base_address = temp['base_addr']
                 if 'reg_offset' in temp:
@@ -91,77 +97,88 @@ class Registers_Model:
         if filter_internal:
             self._filter_internal()
         # initialise to POR values
-        for key in self.__regs:
-            if 'por' in self.__regs[key]:
-                self.__regs[key]['val'] = self.__regs[key]['por']
+        for key in self._regs:
+            if 'por' in self._regs[key]:
+                self._regs[key]['val'] = self._regs[key]['por']
                 self._logger.debug("Initialised 0x{:02X} to POR (0x{:02X})".format(
-                    key, self.__regs[key]['por']))
-            elif 'read_only' in self.__regs[key]:
-                self.__regs[key]['por'] = 0
-                self.__regs[key]['val'] = 0
+                    key, self._regs[key]['por']))
+            elif 'read_only' in self._regs[key]:
+                self._regs[key]['por'] = 0
+                self._regs[key]['val'] = 0
                 self._logger.debug("Initialised 0x{:02X} to POR (0x{:02X}) (READ ONLY)".format(
                     key, 0))
             else:
                 raise ValueError("Register must have 'por' or 'read_only' key ({})"
-                                 .format(self.__regs[key]))
-            if not 'description' in self.__regs[key]:
-                self.__regs[key]['description'] = ""
+                                 .format(self._regs[key]))
+            if not 'description' in self._regs[key]:
+                self._regs[key]['description'] = ""
 
     def _filter_internal(self):
+        """Omits all registers and/or bit groups marked as internal in the register definition from the model
+        """
         temp_regs = {}
-        for r in self.__regs:
-            if 'internal' in self.__regs[r]:
-                if self.__regs[r]['internal']:
+        for r in self._regs:
+            if 'internal' in self._regs[r]:
+                if self._regs[r]['internal']:
                     # if there is 'internal' and it is true
                     continue
             # copy everything but bitgroups
             temp_reg = {}
-            for prop in self.__regs[r]:
+            for prop in self._regs[r]:
                 if prop == 'bit_groups':
                     temp_bgs = []
-                    for bg in self.__regs[r]['bit_groups']:
+                    for bg in self._regs[r]['bit_groups']:
                         if 'internal' in bg:
                             if bg['internal']:
                                 continue
                         temp_bgs.append(bg)
                     temp_reg['bit_groups'] = temp_bgs
                 else:
-                    temp_reg[prop] = self.__regs[r][prop]
+                    temp_reg[prop] = self._regs[r][prop]
             temp_regs[r] = temp_reg
-        #print("REGS: ")
-        #print(self.__regs)
-        #print("Temp regs")
-        #print(temp_regs)
-        self.__regs = temp_regs
+        self._regs = temp_regs
                     
     def set_read_driver(self, driver_func, name=None):
+        """Sets a read driver to the model. Typically used to make reads from the model read from a device over an interface.
+
+        :param driver_func: The driver function (callback) used to read from the interface
+        :type driver_func: function
+        :param name: Name of the driver. If not specified then it sets the default read driver.
+        :type name: str, optional
+        """
         name = name or 'default'
         self._read_driver[name] = driver_func
 
     def set_write_driver(self, driver_func, name=None):
+        """Sets a write driver to the model. Typically used to make writes to the model write to a device over an interface.
+
+        :param driver_func: The driver function (callback) used to write to the interface
+        :type driver_func: function
+        :param name: Name of the driver. If not specified then it sets the default write driver.
+        :type name: str, optional
+        """
         name = name or 'default'
         self._write_driver[name] = driver_func
 
-    # Adds 'unused' to any non-specified bit groups
-    # (only if there is already a bit group defined
-    # for that register
     def add_unused_bits_and_order(self):
-        for r in self.__regs:
-            if 'bit_groups' in self.__regs[r]:
-                self.check_bitgroup(self.__regs[r]['bit_groups'])
-                used_bits = [-1 for x in range(0, self.__data_bits)]
-                for i in range(0, len(self.__regs[r]['bit_groups'])):
-                    bg = self.__regs[r]['bit_groups'][i]
+        """Adds 'unused' to any non-specified bit groups (only if there is already a bit group defined for that register)
+        """
+        for r in self._regs:
+            if 'bit_groups' in self._regs[r]:
+                self.check_bitgroup(self._regs[r]['bit_groups'])
+                used_bits = [-1 for x in range(0, self._data_bits)]
+                for i in range(0, len(self._regs[r]['bit_groups'])):
+                    bg = self._regs[r]['bit_groups'][i]
                     if 'bit' in bg:
-                        if bg['bit'] >= 0 and bg['bit'] < self.__data_bits:
+                        if bg['bit'] >= 0 and bg['bit'] < self._data_bits:
                             used_bits[bg['bit']] = i
                         else:
                             raise ValueError(
                                 "Processing {}, bit out of range".format(bg))
                     else:
                         # msb and lsb should be there
-                        if (bg['msb'] >= 0 and bg['msb'] < self.__data_bits) and \
-                                (bg['lsb'] >= 0 and bg['lsb'] < self.__data_bits):
+                        if (bg['msb'] >= 0 and bg['msb'] < self._data_bits) and \
+                                (bg['lsb'] >= 0 and bg['lsb'] < self._data_bits):
                             if bg['lsb'] >= bg['msb']:
                                 raise ValueError(
                                     "Processing {}, lsb>=msb".format(bg))
@@ -198,77 +215,69 @@ class Registers_Model:
                                 })
                         else:
                             new_bitgroups.append(
-                                self.__regs[r]['bit_groups'][used_bits[i-1]])
-                self.__regs[r]['bit_groups'] = new_bitgroups
+                                self._regs[r]['bit_groups'][used_bits[i-1]])
+                self._regs[r]['bit_groups'] = new_bitgroups
 
     def check_bitgroup(self, bitgroup):
+        """Checks correctness of bit groups specified in definition file
+
+        :param bitgroup: The single bit groups dict of a register 
+                         (containing the individual bit groups)
+        :type bitgroup: dict
+        """
         for bg in bitgroup:
             if 'bit' in bg:
-                if bg['bit'] >= 0 and bg['bit'] < self.__data_bits:
+                if bg['bit'] >= 0 and bg['bit'] < self._data_bits:
                     return
             elif 'msb' in bg and 'lsb' in bg:
-                if bg['msb'] >= 0 and bg['msb'] < self.__data_bits \
-                        and bg['lsb'] >= 0 and bg['lsb'] < self.__data_bits:
+                if bg['msb'] >= 0 and bg['msb'] < self._data_bits \
+                        and bg['lsb'] >= 0 and bg['lsb'] < self._data_bits:
                     if bg['lsb'] < bg['msb']:
                         return
             else:
                 raise ValueError("Error in bitgroup: {}".format(bitgroup))
 
-    '''
-  def break_ranges
-
-  def get_next_lsb(bitgroups,after):
-    cur_res = 9999999999999 # large number
-    for bg in bitgroups:
-      #if 
-    
-    
-  def add_unused_bits_2(self):
-    for r in self.__regs:
-      print (self.__regs[r])
-      if 'bit_groups' in self.__regs[r]:
-        check_bitgroup(self.__regs[r]['bit_groups'])
-        check_bitgroup_overlap(self.__regs[r]['bit_groups'])
-        finished_groups = False
-        find_lower = 0;
-        while finished_groups == False:
-          print("finding: {}".format(find_lower)) 
-          res = None
-          for bg in self.__regs[r]['bit_groups']:
-            if 'bit' in bg:
-              if bg['bit'] == find_lower:
-                res = bg
-                break
-            if 'lsb' in bg:
-              if bg['lsb'] == find_lower:
-                res = bg
-                break
-          #if 
-  '''
-
     def __str__(self):
+        """Returns string representation of a register model
+        """
         return self.get_reg_string()
 
     def as_markdown(self, expand_bitgroups=False):
+        """Exports the register model as a markdown table
+
+        :param expand_bitgroups: Whether to have a row for each individual
+                                 bitgroup or not
+        :type expand_bitgroups: bool, optional
+        """
         output_text = '| Address | Name            | Description              | POR |'
         output_text += '\n| ------- | --------------- | ------------------------ | --- |'
-        hex_digits = int((self.__data_bits / 4)+0.5)
+        hex_digits = int((self._data_bits / 4)+0.5)
         fmt = '0x{:0'+str(hex_digits)+'X}'
-        for k in self.__regs:
+        for k in self._regs:
             output_text += ("\n|0x{:02X} | `{}` | {} |"+fmt+"|").format(
-                k, self.__regs[k]['name'], self.__regs[k]['description'], self.__regs[k]['por'])
-            if ('bit_groups' in self.__regs[k]) and expand_bitgroups:
-                for b in self.__regs[k]['bit_groups']:
+                k, self._regs[k]['name'], self._regs[k]['description'], self._regs[k]['por'])
+            if ('bit_groups' in self._regs[k]) and expand_bitgroups:
+                for b in self._regs[k]['bit_groups']:
                     if 'bit' in b:
                         output_text += '\n|  |  | [' + \
                             str(b['bit'])+'] `'+b['name']+'` |'
                     else:
-                        # print('['+str(b['msb'])+':'+str(b['lsb'])+']'+b['name'])
                         output_text += '\n|  |  | ['+str(b['msb'])+':'+str(
                             b['lsb'])+'] `'+b['name']+'` |'
         return output_text
 
     def reg_bits(self, val, msb, lsb):
+        """Returns a string representation of a bitgroup in a binary string form (i.e. a register). E.g. used for bit group PoR binary values in latex and html documentation tables.
+
+        :param val: the full register value (typically the PoR value)
+        :type val: int
+        :param msb: The MSB index of the bit group within the register
+        :type msb: int
+        :param lsb: The LSB index of the bit group within the register
+        :type lsb: int
+        :return: the binary bit group value
+        :rtype: str
+        """
         new_val = "{0:0100b}".format(val)
         new_val = new_val[::-1]
         new_val = new_val[lsb:msb+1]
@@ -279,17 +288,29 @@ class Registers_Model:
         new_val = new_val.strip()
         return (str(len(new_val.replace(' ','')))+'b'+new_val[::-1])
 
-    # note that the returned value does not have the base address included
     def _get_highest_address(self):
+        """Returns the highest address specified in the register (note that the returned value does not have the base address included). 
+        
+        :return: The highest register address
+        :rtype: int
+        """
         highest = 0
-        for k in self.__regs:
+        for k in self._regs:
             if k > highest:
                 highest = k
         return (k*self._reg_offset)
 
-    def as_code_constants(self,reg_name):
-        hex_digits = int((self.__data_bits / 4)+0.5)
-        lf = line_format.Line_Format(reg_name,60,hex_digits)
+    def as_code_constants(self, reg_name):
+        """Exports the register model information as code constants (defines) for generating the embedded code constants (register addresses and bit group masks
+
+        :param reg_name: The name of the overall register file in the software
+                         defines
+        :type reg_name: str
+        :return: The text of the defines and masks for the whole register file
+        :rtype: str
+        """
+        hex_digits = int((self._data_bits / 4)+0.5)
+        lf = line_format.Line_Format(reg_name, 60, hex_digits)
         output_text = ''
         output_text += '\n\n// '+reg_name
         output_text += '\n// Generated from: '+self._reg_config_name+'\n'
@@ -300,14 +321,14 @@ class Registers_Model:
             output_text += lf.fmt("SET_OFFSET", self._set_addr_offset)
         if self._clr_addr_offset:
             output_text += lf.fmt("CLR_OFFSET", self._clr_addr_offset)
-        for k in self.__regs:
-            cur_reg = self.__regs[k]
+        for k in self._regs:
+            cur_reg = self._regs[k]
             output_text += lf.fmt(
                 cur_reg['name'],
                 base + (k*self._reg_offset),
                 postfix='REG')
-            if ('bit_groups' in self.__regs[k]):
-                for b in self.__regs[k]['bit_groups']:
+            if ('bit_groups' in self._regs[k]):
+                for b in self._regs[k]['bit_groups']:
                     if 'bit' in b:
                         output_text += lf.fmt(
                             b['name'],
@@ -327,50 +348,54 @@ class Registers_Model:
                             mask,indent=2,reg=k,postfix='BIT_MASK')
         return output_text
 
-    def as_latex(self, content_only=True,
+    def as_latex(
+                 self,
                  detail_level=0,
                  reg_address=None,
-                 show_offset_only=True,
-                 caption="caption", label="label"):
+                 show_offset_only=True):
+        """Exports the register file to a latex table
+
+        :param detail_level: 0: registers only, 1: also show any bit groups
+                             2: also show any value tables for individual bit
+                             groups
+        :type detail_level: int
+        :param reg_address: If specified, the returned table is only for a 
+                            single register of the register file, as
+                            identified by this address (which excludes a base
+                            address offset). 
+        :type reg_address: int, optional
+        :param show_offset_only: If True, it only shows the offset, without 
+                                 the base address. 
+        :type show_offset_only: bool, optional
+        :return: The source code of the latex table
+        :rtype: str
+        """
         output_text = ''
         temp_base_addr = self._base_address
-        if show_offset_only:
-            temp_base_addr = 0
-        if not content_only:
-            output_text += '\n'+r'\begin{table}[t]'
-            output_text += '\n'+r'\centering'
-            output_text += '\n'+r'\caption{}'
-            output_text += '\n'+r'\label{tab:my-table}'
-        #output_text += '\n'+r'\begin{tabular}{|l|l|p{6.5cm}|l|}'
-        #output_text += '\n'+r'\begin{longtable}{|l|l|p{6.0cm}|p{2cm}|}'
-        #output_text += '\n'+r'\centering'
-        hex_digits = int((self.__data_bits / 4)+0.5)
+        temp_base_addr = 0
+        hex_digits = int((self._data_bits / 4)+0.5)
         fmt = '0x{:0'+str(hex_digits)+'X}'
         output_text += r'\endfirsthead'
         output_text += '\n'+r'\endhead'
         output_text += '\n'+r'\hline'
-        #base_addr_string =""
-        #if self._base_address: # not used
-        #    base_addr_string = r'\tablefootnote{'+"0x{:02X}".format(self._base_address)+r'}'
-        #    base_addr_string = r'\tablefootnote{banana}'
         base_addr_string = ""
         if (not reg_address) and self._base_address and show_offset_only:
             base_addr_string = r" \\(+0x{:02X})".format(self._base_address)
         output_text += '\n'+r'\rowcolor{'+self.__table_colour_head \
             + r'}\shortstack[l]{Address '+base_addr_string+r'} & Name & Description  & POR  \\ \hline'
         is_first = True
-        for k in self.__regs:
+        for k in self._regs:
             if reg_address:
                 if reg_address != k:
                     continue 
-            cur_reg = self.__regs[k]
+            cur_reg = self._regs[k]
             output_text += ("\n0x{:02X} & {} & {} & "+fmt+r" \\ \hline").format(
                     k*self._reg_offset if not temp_base_addr else (k*self._reg_offset)+self._base_address,
-                    self.__regs[k]['name'].replace('_', r'\_'),
-                    self.__regs[k]['description'].replace('_', r'\_'),
-                    self.__regs[k]['por'])
-            if ('bit_groups' in self.__regs[k]) and detail_level > 0:
-                for b in self.__regs[k]['bit_groups']:
+                    self._regs[k]['name'].replace('_', r'\_'),
+                    self._regs[k]['description'].replace('_', r'\_'),
+                    self._regs[k]['por'])
+            if ('bit_groups' in self._regs[k]) and detail_level > 0:
+                for b in self._regs[k]['bit_groups']:
                     output_text += '\n'
                     temp_description = b['description'].replace('_', r'\_') if \
                         'description' in b else ' '
@@ -396,24 +421,33 @@ class Registers_Model:
                             output_text += str(v)+': ' + \
                                 str(b['value_table'][v]).replace('_', r'\_')
                             output_text += r' &   \\ \hline'
-
-        #output_text += '\n'+r'\end{tabular}'
-        #output_text += '\n'+r'\end{longtable}'
-        if not content_only:
-            output_text += '\n'+r'\end{table}'
         return output_text
 
     def as_html(self,
                  detail_level=0,
                  show_offset_only=True,
                  show_notes=False):
+        """Exports the register file to a html table. If internal registers have not already been filtered, then these are styled differently to distinguish them
+
+        :param detail_level: 0: registers only, 1: also show any bit groups
+                             2: also show any value tables for individual bit
+                             groups
+        :type detail_level: int
+        :param show_offset_only: If True, it only shows the offset, without 
+                                 the base address. 
+        :type show_offset_only: bool, optional
+        :param show_notes: Whether to show longer, verbose notes specified in register definition
+        :type show_notes: bool, optional
+        :return: The source code of the html table
+        :rtype: str
+        """
         output_text = ''
         temp_base_addr = self._base_address
         if show_offset_only:
             temp_base_addr = 0
         output_text += '\n<p>Base: 0x{:02X}</p><p>Data bits: {}</p>'.format(
                 self._base_address if self._base_address else 0,
-                self.__data_bits)
+                self._data_bits)
         output_text += '<p>Reg offset: {}</p>'.format(
                 self._reg_offset)
         if self._set_addr_offset:
@@ -427,30 +461,30 @@ class Registers_Model:
         output_text += '    <th>Description</th>\n'
         output_text += '    <th>POR</th>\n'
         output_text += '</tr>'
-        hex_digits = int((self.__data_bits / 4)+0.5)
+        hex_digits = int((self._data_bits / 4)+0.5)
         fmt = '0x{:0'+str(hex_digits)+'X}'
-        for k in self.__regs:
-            cur_reg = self.__regs[k]
-            if 'internal' not in self.__regs[k]:
+        for k in self._regs:
+            cur_reg = self._regs[k]
+            if 'internal' not in self._regs[k]:
                 output_text += '\n\n\n<tr class="reg">'
             else:
-                if self.__regs[k]['internal']:
+                if self._regs[k]['internal']:
                     output_text += '\n\n\n<tr class="internal-reg">'
                 else:
                     output_text += '\n\n\n<tr class="reg">'
             output_text += ("\n<td>0x{:02X}</td> <td>{} </td><td> {} </td><td> "+fmt+"</td>").format(
                     k*self._reg_offset if not temp_base_addr \
                             else (k*self._reg_offset)+self._base_address,
-                    self.__regs[k]['name'],
-                    self.__regs[k]['description'] if not show_notes else \
+                    self._regs[k]['name'],
+                    self._regs[k]['description'] if not show_notes else \
                             "<p>{}:</p>\n{}".format(
-                                    self.__regs[k]['description'],
-                                    "" if 'notes' not in self.__regs[k] \
-                                            else "<p>"+("</p><p>".join(self.__regs[k]['notes'].split('\n'))).replace('\\t',HTML_TAB)+"</p>" ),
-                    self.__regs[k]['por'])
+                                    self._regs[k]['description'],
+                                    "" if 'notes' not in self._regs[k] \
+                                            else "<p>"+("</p><p>".join(self._regs[k]['notes'].split('\n'))).replace('\\t',HTML_TAB)+"</p>" ),
+                    self._regs[k]['por'])
             output_text += '\n</tr>\n'
-            if ('bit_groups' in self.__regs[k]) and detail_level > 0:
-                for b in self.__regs[k]['bit_groups']:
+            if ('bit_groups' in self._regs[k]) and detail_level > 0:
+                for b in self._regs[k]['bit_groups']:
                     bg_class = "bg"
                     if 'internal' not in b:
                         bg_class = "bg"
@@ -490,50 +524,79 @@ class Registers_Model:
         output_text += '\n</table>'
         return output_text
 
+    def get_value_table(self, addr, bit_group):
+        """Returns value table from a specific bit group of a specific register. E.g. used to get perf values for M0N0S2 chip
 
-
-    def get_value_table(self,addr,bit_group):
+        :param addr: The address of the register containing the relevant bit group (can be the name of the register or address [excluding offset]). 
+        :type addr: str, int
+        :return: the value table
+        :rtype: dict
+        """
         return self.read_model(addr,bit_group=bit_group)['value_table']
 
     def get_base_address(self):
-      return self._base_address
+        """Returns the base address of the register file
+
+        :return: the base address
+        :rtype: int
+        """
+        return self._base_address
 
     def get_reg_string(self, data_base='hex'):
+        """Returns a string representation of the register file
+
+        :param data_base: The number system to use to represent the values
+                          (allowed values: "bin", "hex", "dec")
+        :type data_base: str, optional
+        """
         result_str = ""
         if (self._base_address):
             result_str += "base address: 0x{:X}\n".format(self._base_address)
-        hex_digits = int((self.__data_bits / 4)+0.5)
+        hex_digits = int((self._data_bits / 4)+0.5)
         fmt = '0x{:0'+str(hex_digits)+'X}'
         if data_base == 'bin':
-            fmt = 'b{:0'+str(self.__data_bits)+'b}'
+            fmt = 'b{:0'+str(self._data_bits)+'b}'
         elif data_base == 'dec':
-            fmt = '{:0'+str(len(str(2**self.__data_bits)))+'d}'
+            fmt = '{:0'+str(len(str(2**self._data_bits)))+'d}'
         return result_str +'\n'.join([("0x{:02X}: "+fmt+"    POR: "+fmt+"    {}").format(
-            x, self.__regs[x]['val'], self.__regs[x]['por'], self.__regs[x]['name'])
-            for x in sorted([k for k in self.__regs])])
+            x, self._regs[x]['val'], self._regs[x]['por'], self._regs[x]['name'])
+            for x in sorted([k for k in self._regs])])
 
     def read_model(self, addr, bit_group=None):
+        """Reads a register or bit group value from the model (i.e. not using the read driver)
+
+        :param addr: The register address. Either the name of the register or
+                     the numerical address (without base address added). 
+        :type addr: int, str
+        :param bit_group: Name of the bit group to read. Reads the whole
+                          register if not specified.
+        :type bit_group: str, optional
+        :return: The value as well as the bit group MSB and LSB, the full
+                 register value, whether the register is read-only and the
+                 value table (where applicable)
+        :rtype: dict
+        """
         num_addr = None
         if isinstance(addr, (int)):
-            if not addr in self.__regs:
+            if not addr in self._regs:
                 raise ValueError(
                     "Error: address (0x{:02X}) not valid!".format(addr))
-            res = self.__regs[addr]
+            res = self._regs[addr]
             num_addr = addr
         elif isinstance(addr, str):
             key = None
             val = None
-            for k, v in self.__regs.items():
+            for k, v in self._regs.items():
                 if v['name'] == addr:
                     key = k
                     val = v
             if key is None:
-                raise ValueError("{} not in self.__regs".format(addr))
+                raise ValueError("{} not in self._regs".format(addr))
             num_addr = key
             res = val
-            # if not addr in [x['name'] for x in self.__regs]: # TODO Check
+            # if not addr in [x['name'] for x in self._regs]: # TODO Check
             #  raise ValueError("Reg model does not contain: {}".format(addr))
-            #res = [x for x in self.__regs if x['name'] == addr]
+            #res = [x for x in self._regs if x['name'] == addr]
             # if len(res) != 1:
             #  raise ValueError("length of res != 1, res: {}".format(res))
             #res = res[0]
@@ -565,12 +628,30 @@ class Registers_Model:
         return {'val': result, 'msb': msb, 'lsb': lsb, 'addr': num_addr, 'full_reg': res['val'], "read_only" : read_only, 'value_table' : val_table}
 
     def read_device(self, address, driver_name='default'):
+        """Reads a device register directly via a read driver
+
+        :param address: The register absolute address (including the base address)
+        :type address: int
+        :param driver_name: The name of the read driver to use. If not
+                            specified, uses the default read driver
+        :type driver_name: str, optional
+        """
         self._logger.debug("Read device address: {:0X} using driver: {}".format(
             address,
             driver_name))
         return self._read_driver[driver_name](address)
 
     def write_device(self, address, data, driver_name='default'):
+        """Writes a device register directly via a write driver
+
+        :param address: The register absolute address (including the base address)
+        :type address: int
+        :param data: Data to write
+        :type data: int
+        :param driver_name: The name of the write driver to use. If not
+                            specified, uses the default write driver
+        :type driver_name: str, optional
+        """
         self._logger.debug("Write device address: {:0X}, data: {:0X}, using driver: {}".format(
             address,
             data,
@@ -578,6 +659,17 @@ class Registers_Model:
         return self._write_driver[driver_name](address, data)
 
     def select_bit_range(self, val, msb, lsb):
+        """Extracts bit group value from the full register value
+
+        :param val: The register value
+        :type val: int
+        :param msb: The bit group MSB index
+        :type msb: int
+        :param lsb: The bit group LSB index
+        :type lsb: int
+        :return: The value of the bit group
+        :rtype: int
+        """
         if val < 0:
             raise ValueError("Value must be positive")
         self._logger.debug('Select bit range in: {0:b}'.format(val))
@@ -593,22 +685,30 @@ class Registers_Model:
               addr,
               data,
               write_driver_name='default'):
+        """ Writes to a register using the dedicated hardware "set" function (if available, some registers have a hardware-supported SET command if a specific offset is applied to the address). Updates the model. 
+
+        :param addr: The name of the register to set or the numerical
+                     relative address (excluding offset)
+        :type addr: int, str
+        :param data: The data to set
+        :type data: int
+        """
         self._logger.debug("Write set: A: {}, Data {:X}".format(addr,data))
         if not self._set_addr_offset:
             raise NotImplementedError("This register does not have set function")
         model_rd_data = self.read_model(addr)
         full_reg_val = model_rd_data['full_reg']
-        if data > 2**self.__data_bits - 1 or data < 0:
+        if data > 2**self._data_bits - 1 or data < 0:
             raise ValueError("Error: data larger than data_bits bits!")
         new_val = data
         if isinstance(addr, (int)):
-            self.__regs[addr]['val'] = model_rd_data['val'] | data
+            self._regs[addr]['val'] = model_rd_data['val'] | data
             self.write_device(
                 self.get_device_address(addr) + self._set_addr_offset, 
                 new_val,
                 driver_name=write_driver_name)
         else:  # str
-            self.__regs[model_rd_data['addr']]['val']  = model_rd_data['val'] | data
+            self._regs[model_rd_data['addr']]['val']  = model_rd_data['val'] | data
             self.write_device(
                 self.get_device_address(model_rd_data['addr']) + self._set_addr_offset,
                 new_val,
@@ -618,21 +718,29 @@ class Registers_Model:
               addr,
               data,
               write_driver_name='default'):
+        """ Writes to a register using the dedicated hardware "clear" function (if available, some registers have a hardware-supported CLEAR command if a specific offset is applied to the address). Updates the model. 
+
+        :param addr: The name of the register to clear or the numerical
+                     relative address (excluding offset)
+        :type addr: int, str
+        :param data: The data to clear
+        :type data: int
+        """
         if not self._clr_addr_offset:
             raise NotImplementedError("This register does not have clear function")
         new_val = data
         model_rd_data = self.read_model(addr)
         full_reg_val = model_rd_data['full_reg']
-        if data > 2**self.__data_bits - 1 or data < 0:
+        if data > 2**self._data_bits - 1 or data < 0:
             raise ValueError("Error: data larger than data_bits bits!")
         if isinstance(addr, (int)):
-            self.__regs[addr]['val'] = model_rd_data['val'] & (~data)
+            self._regs[addr]['val'] = model_rd_data['val'] & (~data)
             self.write_device(
                 self.get_device_address(addr) + self._clr_addr_offset, 
                 new_val,
                 driver_name=write_driver_name)
         else:  # str
-            self.__regs[model_rd_data['addr']]['val'] = model_rd_data['val'] & (~data)
+            self._regs[model_rd_data['addr']]['val'] = model_rd_data['val'] & (~data)
             self.write_device(
                 self.get_device_address(model_rd_data['addr']) + self._clr_addr_offset,
                 new_val,
@@ -645,6 +753,29 @@ class Registers_Model:
               write_driver_name='default',
               read_device=False,
               read_driver_name='default'):
+        """Write to a register or bit group via a write driver and update the model. The typical way to write a value to a register. 
+
+        :param addr: The name of the register or numerical relative address
+                     (excluding offset) of the register to write to. 
+        :type addr: str, int
+        :param data: The data value to write
+        :type data: int
+        :param bit_group: The name of the bit group to write to. If not
+                          specified, the whole register is written to
+        :type bit_group: str, optional
+        :param write_driver: The write driver to use. Uses the default 
+                             driver if not specified.
+        :type write_driver: str, optional
+        :param read_device: Whether to read the value before writing to check
+                            the existing modelled value (in case it has been
+                            updated externally). (The modelled value is used
+                            for masking if writing a bit group)
+        :type read_device: bool, optional
+        :param read_driver_name: The name of the read driver for checking the
+                                 existing modelled value. If not specified, 
+                                 the default read driver is used. 
+        :type read_driver_name: str, optional
+        """
         model_rd_data = self.read_model(addr, bit_group)
         hw_read_val = None
         if read_device:
@@ -672,13 +803,13 @@ class Registers_Model:
             bin_full_reg = bin_full_reg[::-1]
             new_val = int(bin_full_reg, 2)
             if isinstance(addr, (int)):
-                self.__regs[addr]['val'] = new_val
+                self._regs[addr]['val'] = new_val
                 self.write_device(
                     self.get_device_address(addr), 
                     new_val,
                     driver_name=write_driver_name)
             else:  # str
-                self.__regs[model_rd_data['addr']]['val'] = new_val
+                self._regs[model_rd_data['addr']]['val'] = new_val
                 self.write_device(
                     self.get_device_address(model_rd_data['addr']),
                     new_val,
@@ -686,19 +817,19 @@ class Registers_Model:
         else:
             # a whole register value
             new_val = data
-            if data > 2**self.__data_bits - 1 or data < 0:
+            if data > 2**self._data_bits - 1 or data < 0:
                 raise ValueError("Error: data larger than data_bits bits!")
             if isinstance(addr, (int)):
-                if not addr in self.__regs:
+                if not addr in self._regs:
                     raise ValueError(
                         "Error: address (0x{:02X}) not valid!".format(addr))
-                self.__regs[addr]['val'] = data
+                self._regs[addr]['val'] = data
                 self.write_device(
                     self.get_device_address(addr), 
                     new_val,
                     driver_name=write_driver_name)
             else:  # str
-                self.__regs[model_rd_data['addr']]['val'] = data
+                self._regs[model_rd_data['addr']]['val'] = data
                 self.write_device(
                     self.get_device_address(model_rd_data['addr']),
                     new_val,
@@ -709,6 +840,19 @@ class Registers_Model:
              addr,
              bit_group=None,
              driver_name='default'):
+        """Read from a register or bit group via a read driver. The typical way to read a value from a register. 
+
+        :param addr: The name of the register or numerical relative address
+                     (excluding offset) of the register to read from. 
+        :type addr: str, int
+        :param bit_group: The name of the bit group to read. If not
+                          specified, the whole register is read
+        :type bit_group: str, optional
+        :param driver_name: The name of the read driver to use. If not
+                            specified, the default read driver is used
+        :return: The read value
+        :rtype: int
+        """
         model_data = self.read_model(addr, bit_group)
         if not self._read_driver[driver_name]:
             self._logger.warning("No read driver, returning modelled value")
@@ -734,7 +878,12 @@ class Registers_Model:
             return self.select_bit_range(hw_val, model_data['msb'], model_data['lsb'])
 
     def get_valid_addresses(self):
-        return list(self.__regs.keys())
+        """Gets all defined addresses in the register file
+
+        :return: The defined (valid) integer relative addresses
+        :rtype: list
+        """
+        return list(self._regs.keys())
 
     def get_map_address(self,address):
         if isinstance(address, (int)):

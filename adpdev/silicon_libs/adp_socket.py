@@ -52,19 +52,25 @@ class ADP_Conn:
     :type logger: logging.Logger object
     :param sample_period: How often the ADP connection is read into a software buffer (in a separate thread)
     :type sample_period: float
-    :param transaction_log: path of a log file to log transactions
-    :type transaction_log: str
+    :param log_directory: path of a directory for logging
+    :type log_directory: str, optional
+    :param logfile_name: A name that can be added to the logfile
+                           filename (i.e. if multiple instances of this
+                           class are used)
+    :type logfile_name: str, optional
     """
     def __init__(self,
                  logger=False,
                  sample_period=0.05,
-                 transaction_log = 'logs/adp_transactions.log'
+                 log_directory = 'logs',
+                 logfile_name = None
                  ):
         """Constructor
         """
         self._logger = logger or logging.getLogger(__name__)
-        self._tx_log_filename = transaction_log
-        with open(transaction_log,'w+') as f:
+        self._tx_log_filename = os.path.join(log_directory, 'adp_transactions'
+                +(("-"+logfile_name) if logfile_name else "")+'.log')
+        with open(self._tx_log_filename,'w+') as f:
             f.write('')
         f.closed
         self._sample_period = sample_period
@@ -72,7 +78,8 @@ class ADP_Conn:
         self._read_buffer = None
         self._prompt_timeout = 5
         self._prompt_pattern = ']'
-        time.sleep(1)
+        self._read_buffer_log_path = os.path.join(log_directory, 'read_buffer'
+            +(("-"+logfile_name) if logfile_name else "")+'.log')
 
     def set_adp_tx_callbacks(self, callbacks):
         """Set callback functions to call when ADP transaction of specific names are received via ADP
@@ -125,7 +132,7 @@ class ADP_Conn:
         self._read_buffer = read_buffer.ReadBuffer(
             self._port,
             self._sample_period,
-            'logs/read_buffer.log',
+            self._read_buffer_log_path,
             logger=self._logger,
             tx_log_func = self._log_transaction,
             print_received=print_received

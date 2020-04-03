@@ -13,9 +13,11 @@ ADPDev API Documentation
    adpdev.rst
    testchip_api.rst
    registers_models_api.rst
+   mem_map_api.rst
    utils_api.rst
    adp_sock_api.rst
    read_buffer_api.rst
+   tc_controller_api.rst
 
 
 Indices and tables

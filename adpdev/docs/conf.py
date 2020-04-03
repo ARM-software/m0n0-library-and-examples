@@ -19,7 +19,7 @@ sys.path.insert(0, os.path.abspath('../registers_models'))
 
 # -- Project information -----------------------------------------------------
 
-project = 'ADPDev'
+project = 'ADPDev Reference Manual'
 copyright = '2020, Arm Research'
 author = 'Arm Research'
 
@@ -54,3 +54,23 @@ html_theme = 'alabaster'
 # relative to this directory. They are copied after the builtin static files,
 # so a file named "default.css" will overwrite the builtin "default.css".
 html_static_path = ['_static']
+
+
+# -- Options for LaTeX output ------------------------------------------------
+
+latex_engine = 'pdflatex'
+latex_elements = {
+    'preamble': r'''
+\usepackage[default]{lato}
+\usepackage[T1]{fontenc}
+\definecolor{ArmBlue}{HTML}{0091BD}
+\hypersetup{
+    colorlinks=true,
+    urlcolor=ArmBlue,
+    linkcolor=ArmBlue,
+    filecolor=ArmBlue,      
+    citecolor=ArmBlue,
+}
+'''
+}
+latex_show_urls = 'footnote'

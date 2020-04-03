@@ -138,18 +138,6 @@ void AESClass::set_key(uint32_t key[8]) {
     this->write(AES_KEY_7_REG,key[7]);
 }
 
-uint32_t* AESClass::get_key(uint32_t res[8]) {
-    res[0] = this->read(AES_KEY_0_REG);
-    res[1] = this->read(AES_KEY_1_REG);
-    res[2] = this->read(AES_KEY_2_REG);
-    res[3] = this->read(AES_KEY_3_REG);
-    res[4] = this->read(AES_KEY_4_REG);
-    res[5] = this->read(AES_KEY_5_REG);
-    res[6] = this->read(AES_KEY_6_REG);
-    res[7] = this->read(AES_KEY_7_REG);
-    return res;
-}
-
 void AESClass::_wait_for_completion() {
     uint32_t debug_count = 0; 
     while (this->read(AES_STATUS_REG) != 1) {

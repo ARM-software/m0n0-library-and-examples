@@ -147,7 +147,6 @@ M0N0_System::M0N0_System()
             STATUS_R07_MEMORY_REMAP_BIT_MASK);
     temp_code_ctrl |= (5 << 3);
     this->spi->pcsm_write(PCSM_CODE_CTRL_REG, temp_code_ctrl);
-    this->log_debug("Instantiated Sys");
 }
 
 #ifdef M0N0_HEAP

@@ -33,6 +33,20 @@ import silicon_libs.regex_lib as regex_lib
 wait_adp_str = '<W><a><i><t><i><n><g>< ><f><o><r>< ><A><D><P>< ><d><i><r><e><c><t><i><o><n>'
 
 class TestcaseController:
+    """Stores database of testcases in the embedded software and enables them to be commanded to run, and results collected. 
+
+    :param path_to_tc_table: Path the testcase-list.csv file
+    :type path_to_tc_table: str
+    :param adp_sock: The ADP Socket
+    :type adp_sock: adp_socket.ADP_Conn
+    :param ctrl_reg: The M0N0 System control register object
+    :type ctrl_reg: registers_model.Registers_Model
+    :param logger: The logger object for logging messages to the console
+                   and file
+    :type logger: logging.Logger object
+    :param tcs_to_run_path: A path to a list of testcase names to run, one-after another
+    :type tcs_to_run_path: str
+    """
     def __init__(self,
             path_to_tc_table,
             adp_sock,
@@ -40,10 +54,12 @@ class TestcaseController:
             logger=False,
             tcs_to_run_path = None
             ):
+        """ Constructor
+        """
         self._logger = logger or logging.getLogger(__name__)
         self._logger.info("Initialising Testcase_Controller")
         self._adp_sock = adp_sock
-        self._db = create_testcase_db(path_to_tc_table,logger=self._logger)
+        self._db = _create_testcase_db(path_to_tc_table,logger=self._logger)
         self._ctrl_reg = ctrl_reg
         self._tcs_to_run = []
         if tcs_to_run_path:
@@ -65,12 +81,28 @@ class TestcaseController:
 
     @property
     def tcs_to_run(self):
+        """Returns the list of testcases to run, one-after-another (if set)
+        
+        :return: The testcases list to be run
+        :rtype: list containing str elements
+        """
         return self._tcs_to_run
 
     def get_testcase_list(self):
+        """Returns the names of the testcases in the testcase database (e.g. loaded from the testcase-list.csv)
+
+        :return List of testcases in the embedded software that can be run
+        """
         return self._db['data']['Testcase_Enum']
 
     def get_testcase_id(self,name):
+        """Gets the ID of a testcase from its name. This is what is sent to the chip to command it to run the testcase. Derived from the position of the testcase in the testcase list. 
+
+        :param name: Name of the testcase (e.g. "HELLO", "EN_D_SLEEP") to find the ID of
+        :type name: str
+        :return: The ID
+        :rtype: int
+        """
         return self._db['data']['Testcase_Enum'].index(name)
 
     def __str__(self):
@@ -81,8 +113,9 @@ class TestcaseController:
     def __getitem__(self, index):
         return self._db['data']['Testcase_Enum'][index]
 
-    # Uses TGO 
     def set_wakeup_testcase(self,tc,repeat_delay=None):
+        """ Sets a testcase to be executed after wakeup (requires specific embedded software support and is for internal testing only)
+        """
         if not isinstance(tc,str):
             raise ValueError("Testcase name must be a string")
         if not repeat_delay:
@@ -120,6 +153,23 @@ class TestcaseController:
                 measure_funcs=None,
                 repeat_delay=None,
                 timeout=1):
+        """Commands a specific testcase in the embedded software in the chip to run a testcase (the embedded software must be waiting in a specific "wait_for_adp" loop to receive this command)
+
+        :param tc: The name of the testcase to run, or the ID of the testcase to run
+        :type tc: str, int
+        :param wait_for_output: If specified, it waits for the testcase to complete (and collects result) before continuing. If True is passed, then it waits until the standard STDOUT indicating the end of a testcase is received. If a string is passed then it waits until it matches that string in the STDOUT. If an integer is passed, then it waits for that number of seconds. 
+        :type wait_for_output: bool, str, int, optional
+        :param regex_funcs: A list of functions that apply regex expressions to the printf output to derive key results from the testcase. The default options passes a list with a single function to match the standard testcase pass/fail flags. These functions must return a dictionary and the keys,values of this dictionary are added to the results dictionary that is returned. 
+        :type regex_funcs: list of functions, optional
+        :param measure_funcs: A list of functions to call if repeating the workload for measurements (see `repeat_delay`). These callback functions are called, one-by-one, in order. These functions must return a dictionary and the keys,values of this dictionary are added to the results dictionary that is returned. 
+        :type measure_funcs: list of functions, optional
+        :param repeat_delay: If None, False or 0, the workload is run once (for normal pass/fail testing). If it is greater than 0, then the workload is repeated (and printf suppressed) for the number specified (in seconds) and the `measure_funcs` run (if specified). 
+        :type repeat_delay: bool, int, optional
+        :param timeout: If waiting to the testcase to finish, then how long to wait before giving up and reporting a timeout (in seconds). Note that when using `repeat_delay` then this value is modified in the code to scale. See the code for details. 
+        :type timeout: bool, int, float, optional
+        :return: If waiting for the output, then a dictionary containing generic results (such as settings [e.g. workload name], start and end time), specific results extracted from the printf output from any `regex_funcs`, and any measurement results from the `measure_funcs`. 
+        :rtype: None, dict
+        """
         tc_table = self._db
         adp = self._adp_sock
         ctrl_reg = self._ctrl_reg
@@ -225,7 +275,7 @@ class TestcaseController:
 
 
 
-def create_testcase_db(path, logger=False):
+def _create_testcase_db(path, logger=False):
     # purposely not using pandas
     logger = logger or logging.getLogger(__name__)
     import re

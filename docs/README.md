@@ -8,7 +8,7 @@ This documentation can be compiled as a PDF (via LaTeX) or HTML.
 ## Installation
 
 1. Download and Install [Doxygen](http://www.doxygen.nl/download.html)
-2. (If a PDF output is desired) Install LaTeX (e.g. install [TexLive](https://www.tug.org/texlive/) or [MacTex](https://www.tug.org/mactex/) for MacOS. 
+2. (If a PDF output is desired) Install LaTeX (e.g. install [TexLive](https://www.tug.org/texlive/) or [MacTex](https://www.tug.org/mactex/) for macOS) 
 
 ## Document Compilation
 

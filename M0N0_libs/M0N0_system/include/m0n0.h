@@ -40,6 +40,11 @@ extern "C" {
     #include "m0n0_defs.h"
 }
 
+/**
+@file
+@brief Defines the M0N0_System class (interface to C++ libraries)
+*/
+
 // The M0N0_HEAP flag makes the M0N0_System object  instantiated
 // on the heap with the "new" keyword. 
 //#define M0N0_HEAP
@@ -622,13 +627,18 @@ class M0N0_System {
          *
          * Note that this is difficult to safely turn off (see 
          * disable_autosampling) 
+         *
+         * @param rtc_ticks The autosampling interval expressed as the number
+         *      of RTC ticks
+         * @param f Pointer to a function to call after four bytes have been
+         *     fetched via SPI
          */
         void enable_autosampling_rtc_ticks(uint32_t rtc_ticks, Handler_Func f);
         /**
          * Enables SPI autosampling mechanism with the desired sample period
          * and callback function
          * 
-         * @param rtc_ticks The RTC ticks between each sample. While the 
+         * @param interval_ms The RTC ticks between each sample. While the 
          *     hardware counts to the specified number of ticks plus one, 
          *     this function subtracts one to compensate. 
          *     0 and 1 is not valid. 
@@ -693,23 +703,24 @@ class M0N0_System {
          * Turns on the PCSM interrupt time (loop timer) to raise an interrupt
          * after the specified time. 
          *
-         * @param The time interval after which to raise an interrupt
-         *        (in milliseconds). 
+         * @param interval_ms The time interval after which to raise an 
+         *        interrupt (in milliseconds). 
          * @param f A pointer to a callback function to execute when the 
-                    interrupt occurs (pass NULL if to not execute a callback
-                    function)
+         *          interrupt occurs (pass NULL if to not execute a callback
+         *          function)
          */
         void enable_pcsm_interrupt_timer_ms(uint32_t interval_ms, Handler_Func f);
+
         /**
          * Turns on the PCSM interrupt time (loop timer) to raise an interrupt
          * after the specified time. Interrupt occurs periodically until
          * disabled.
          *
-         * @param The time interval after which to raise an interrupt
+         * @param rtc_ticks The time interval after which to raise an interrupt
          *        (in RTC clock cycles). 
          * @param f A pointer to a callback function to execute when the 
-                    interrupt occurs (pass NULL if to not execute a callback
-                    function)
+         *          interrupt occurs (pass NULL if to not execute a callback
+         *          function)
          */
         void enable_pcsm_interrupt_timer_rtc_ticks(uint32_t rtc_ticks, Handler_Func f);
         /**
@@ -717,11 +728,6 @@ class M0N0_System {
          * after the specified time. Interrupt occurs periodically until
          * disabled.
          *
-         * @param The time interval after which to raise an interrupt
-         *        (in RTC clock cycles). 
-         * @param f A pointer to a callback function to execute when the 
-                    interrupt occurs (pass NULL if to not execute a callback
-                    function)
          */
         void disable_pcsm_interrupt_timer(void);
         /**

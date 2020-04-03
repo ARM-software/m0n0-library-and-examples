@@ -125,7 +125,7 @@ def derive_adp_port(logger):
                 adp_ports))
     return os.path.join('/dev',adp_ports[0])
 
-def setup_logger(logger, level, log_filepath):
+def setup_logger(logger, level, log_filepath, prefix=None):
     """Sets up and returns a logger object
 
     :param logger: The logger object for logging messages to the console
@@ -135,10 +135,15 @@ def setup_logger(logger, level, log_filepath):
     :type level: str (one of "DEBUG", "INFO", "WARN", "ERROR")
     :param log_filepath: Path to file to log messages to"
     :type log_filepath: str
+    :param prefix: Custom text to prefix to all logging output (i.e. to
+                   distinguish it from other loggers when using multiple
+                   loggers simultaneously). 
+    :type prefix: str, optional
     :return: The logger object for logging messages to the console
                    and file
     :rtype: logging.Logger object
     """
+    prefix = "("+str(prefix)+") " if prefix else ""
     temp_logger = logger
     temp_log_level = logging.getLevelName(level)
     logger.setLevel(temp_log_level)
@@ -146,14 +151,14 @@ def setup_logger(logger, level, log_filepath):
     temp_handler = logging.FileHandler(log_filepath,mode='w')
     temp_handler.setLevel(logging.DEBUG)
     # create a formatter
-    temp_formatter = logging.Formatter('%(levelname)s:%(asctime)s:%(name)s:%(filename)s:%(lineno)s:%(funcName)s():%(message)s')
+    temp_formatter = logging.Formatter('%(levelname)s:%(asctime)s:%(name)s:%(filename)s:%(lineno)s:%(funcName)s():'+prefix+'%(message)s')
     temp_handler.setFormatter(temp_formatter)
     # add file handler to logger
     temp_logger.addHandler(temp_handler)
     # create handler for screen
     console_handler = logging.StreamHandler()
     console_formatter = logging.Formatter(
-            '%(levelname)s (%(filename)s:%(lineno)s):  %(message)s')
+            '%(levelname)s (%(filename)s:%(lineno)s): '+prefix+'%(message)s')
     console_handler.setFormatter(console_formatter)
     temp_logger.addHandler(console_handler)
     return temp_logger

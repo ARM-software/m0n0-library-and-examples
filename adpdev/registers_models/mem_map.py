@@ -35,6 +35,14 @@ import line_format
 _unused_string = 'RESERVED'
 
 class MemoryMap:
+    """Stores information on the system's memory map
+
+    :param map_config: Path to the memory map YAML configuration file
+    :type map_config: str
+    :param logger: The logger object for logging messages to the console
+                   and file
+    :type logger: logging.Logger object
+    """
     def __init__(self, map_config, logger=None):
         self._logger = logger or logging.getLogger(__name__)
         self._logger.info('Creating memory map with "{}"'.format(map_config))
@@ -79,16 +87,31 @@ class MemoryMap:
             return cur_el[attr]
 
     def get_base(self, region):
+        """Gets the base address of a specified region
+        
+        :param region: The memory region to get the base address of
+        :type region: str
+        """
         return self.get_attr(region,'base')
 
     def get_size(self, region):
+        """Gets the size (bytes) of a specified region
+        
+        :param region: The memory region to get the base address of
+        :type region: str
+        """
         return self.get_attr(region,'size')
 
     def get_map_string(self, data_base='hex'):
+        """Gets a string representation of the memory map
+        
+        :param data_base: Which number system based to use to represent the data (e.g. hex (hexadecimal), dec (decimal), bin (binary). 
+        :type data_base: str, optional
+        """
         hex_digits = int((self._address_bits / 4)+0.5)
         fmt = '0x{:0'+str(hex_digits)+'X}'
         if data_base == 'bin':
-            fmt = 'b{:0'+str(self._address_bits_bits)+'b}'
+            fmt = 'b{:0'+str(self._address_bits)+'b}'
         elif data_base == 'dec':
             fmt = '{:0'+str(len(str(2**self._address_bits)))+'d}'
         return '\n'.join([("{:<16}: "+fmt+": size: "+fmt+"").format(
@@ -203,8 +226,6 @@ class MemoryMap:
         output_text += '</table>'
         return output_text
 
-
-
     def __str__(self):
         return self.get_map_string()
 
@@ -219,17 +240,4 @@ if __name__ == "__main__":
     mem_map = MemoryMap(args.map_config)
     print(mem_map)
     print(mem_map.as_latex(detail_level=1))
-    '''
-  print("Now printing markdown")
-  with open('temp.md','w') as f:
-    f.write(my_reg.as_markdown(detail_level=2))
-  f.closed
-  with open('temp.tex','w') as f:
-    f.write(my_reg.as_latex(detail_level=2))
-  f.closed
-  my_reg.add_unused_bits_and_order()
-  with open('temp-after-reorder.tex','w') as f:
-    f.write(my_reg.as_latex(detail_level=2))
-  f.closed
-  print(my_reg.register_detail_as_latex(0x8))
-  '''
+

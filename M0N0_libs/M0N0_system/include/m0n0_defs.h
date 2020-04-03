@@ -41,9 +41,16 @@
 #endif
 #endif
 
+/**
+@file
+@brief Contains low-level C functions used by the C++ libraries. 
+*/
+
 #define STDOUT_BASE       0xB4200000
 #define STDIN_BASE        0xB4300000
 
+/** Defines STDIN/STDOUT registers
+ */
 typedef struct
 {
   __IO uint8_t WDATA;
@@ -67,35 +74,135 @@ typedef struct
 #define STDOUT                    ((FIFO_Type*)   STDOUT_BASE)
 #define STDIN                     ((FIFO_Type*)   STDIN_BASE)
 
-// Interrupt Handlers:
+/** Generic handler function definition
+ */
 typedef void (*Handler_Func)(void);
 
+/** Reads a word from the memory map (register or memory)
+ * 
+ * @param address The absolute (memory map) address to read. E.g. can use the
+ *     auto-generated register definitions defined later in m0n0_defs.h
+ * @return the read register word
+ */
 uint32_t M0N0_read(uint32_t address);
+/** Reads a bit-group of a word from the memory map (register or memory)
+ *
+ * The shifting distance for masking the bit-group
+ *     is calculated automatically at run-time (with an associated overhead). 
+ *     See M0N0_read_mask_and_shift for a more efficient, but less convenient,
+ *     function to read a bit-group.
+ * 
+ * @param address The absolute (memory map) address to read. E.g. can use the
+ *     auto-generated register definitions defined later in m0n0_defs.h
+ * @param mask The bit-mask for the bit-group. E.g. can use the 
+ *     auto-generated bit-group masks defined later in m0n0_defs.h (with
+ *     the _MASK suffix).  
+ * @return the read bit-group value
+ */
 uint32_t M0N0_read_bit_group( // calculates shift at "run-time"
         uint32_t address,
         uint32_t mask);
+/** Reads a bit-group of a word from the memory map (register or memory).
+ *
+ * See M0N0_read_bit_group for a function that automatically calculates the 
+ *     shift distance at run-time (reducing chances of human error). 
+ *  
+ * @param address The absolute (memory map) address to read. E.g. can use the
+ *     auto-generated register definitions defined later in m0n0_defs.h
+ * @param shift The shift distance. E.g. can use the auto-generated bit-group
+ *     shift distance definitions defined later in m0n0_defs.h (with the
+ *     _SHIFT suffix)
+ * @param mask The bit-mask for the bit-group. E.g. can use the 
+ *     auto-generated bit-group masks defined later in m0n0_defs.h (with
+ *     the _MASK suffix).  
+ * @return the read bit-group value
+ */
 uint32_t M0N0_read_mask_and_shift(
         uint32_t address,
         uint32_t shift,
         uint32_t mask);
+/** Writes a word from the memory map (register or memory)
+ * 
+ * @param address The absolute (memory map) address to write. E.g. can use the
+ *     auto-generated register definitions defined later in m0n0_defs.h
+ * @param data The word to write. 
+ */
 void M0N0_write(uint32_t address, uint32_t data);
-void M0N0_write_bit_group( // calculates shift at "run-time"
+/** Writes a bit-group of a word to the memory map (register or memory)
+ *
+ * The shifting distance for masking the bit-group
+ *     is calculated automatically at run-time (with an associated overhead). 
+ *     See M0N0_write_mask_and_shift for a more efficient, but less convenient,
+ *     function to write a bit-group.
+ * 
+ * @param address The absolute (memory map) address to write. E.g. can use the
+ *     auto-generated register definitions defined later in m0n0_defs.h
+ * @param mask The bit-mask for the bit-group. E.g. can use the 
+ *     auto-generated bit-group masks defined later in m0n0_defs.h (with
+ *     the _MASK suffix).  
+ * @param data The data to write into the bit-group
+ */
+void M0N0_write_bit_group(
         uint32_t address,
         uint32_t mask,
         uint32_t data);
+/** Writes a bit-group of a word to the memory map (register or memory).
+ *
+ * See M0N0_write_bit_group for a function that automatically calculates the 
+ *     shift distance at run-time (reducing chances of human error). 
+ *  
+ * @param address The absolute (memory map) address to write. E.g. can use the
+ *     auto-generated register definitions defined later in m0n0_defs.h
+ * @param shift The shift distance. E.g. can use the auto-generated bit-group
+ *     shift distance definitions defined later in m0n0_defs.h (with the
+ *     _SHIFT suffix)
+ * @param mask The bit-mask for the bit-group. E.g. can use the 
+ *     auto-generated bit-group masks defined later in m0n0_defs.h (with
+ *     the _MASK suffix).  
+ * @param data The data to write into the bit-group
+ */
 void M0N0_write_mask_and_shift(
         uint32_t address,
         uint32_t shift,
         uint32_t mask,
         uint32_t data);
 
+/** Calculates bit-shift distance from mask
+ *
+ * @param mask The bit-mask
+ * @return The shift amount for the mask
+ */
 uint8_t mask_to_shift(uint32_t mask);
 
+/** Reads a single character from STDIN (i.e. via ADP). If there is no 
+ *  character in the buffer, it waits until it receives one. 
+ *
+ * @return The next character in the buffer
+ */ 
 char M0N0_read_stdin(void);
+
+/** Writes a single character to STDOUT (i.e. via ADP). Note that DEVE
+ *  must be enabled (see M0N0_is_deve function). Furthermore ADP must be 
+ *  actively read, otherwise the buffer will fill and the system will hang.
+ *
+ * @return The next character in the buffer
+ */
 void M0N0_write_stdout(uint8_t data);
+/** Write a byte over SPI
+ *
+ * @param data The data to write over SPI
+ * @return The received data from SPI
+ */
 uint8_t M0N0_spi_write(uint8_t data);
+
+/** Checks whether DEVE is set or not
+ *
+ * @return TRUE is DEVE is enabled
+ */
 uint8_t M0N0_is_deve(void);
 
+/** Enumerator for specifying the SPI Chip Select
+ */
 typedef enum {
    DESELECT = 0,
    SS0 = 1,
@@ -104,12 +211,16 @@ typedef enum {
    SS3 = 8
 } SPI_SS_t;
 
+/** Enumerator for specifying the read/write abilities of a register
+ */
 typedef enum {
    RW = 0,
    R, // read only
    W, // write only
 } MEM_RD_WR_t;
 
+/** Enumerator for specifying the logger level
+ */
 typedef enum {
    DEBUG = 0,
    INFO = 1,

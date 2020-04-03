@@ -108,7 +108,17 @@ class TestChip(ABC):
                        with the chip ID). If not specified, then no trims are
                        loaded. 
     :type load_trims: str, optional
+    :param chip_name: A name for the chip that is added to log filenames
+                      and other logged information to identify which chip
+                      the logged information belongs to (i.e. intended for
+                      use when multiple chips are connected simultaneously).
+                      E.g. Could be a string-representation of the chip ID or
+                      a nickname. 
+    :type chip_name: str, optional
     """
+
+    _testchip_count = 0
+
     def __init__(self,
             logger=None,
             mbed_port=None,
@@ -117,22 +127,35 @@ class TestChip(ABC):
             load_devram=False,
             tcs_to_run_path=None,
             load_trims=None,
+            chip_name=None
         ):
+        TestChip._testchip_count += 1
         self._logger = logger or logging.getLogger(__name__)
         self._logger.info("Setting up TestChip")
         self._dummy_drivers = DummyDrivers(logger=self._logger)
         self._chip_id = chip_id
         self._tc_ctrl = None
         self._adp_port = None
-        self.adp_sock = None
+        self._adp_sock = None
+        self._ctrl_regs = None
+        self._status_regs = None
+        self._gpio_regs = None
+        self._spi_regs = None
+        self._pcsm_regs = None
+        self._tcs = None
         self._sw_directory = sw_directory
         self._tcs_to_run_path = tcs_to_run_path
         self._load_devram = load_devram
+        self._chip_name = chip_name
+        if self._testchip_count > 1:
+            self._chip_name = self._chip_name if self._chip_name \
+                     else "{:03d}".format(self.chip_id)
         if chip_id is not None:
             self._logger.info("Chip ID: {:03d}".format(self._chip_id))
         else:
             self._logger.warn("No Chip ID")
-        self.mem_map = None 
+        self._logger.info("Chip name: {}".format(self._chip_name))
+        self._mem_map = None 
         # MBED Connection
         self._mbed_port = mbed_port or None
         self.mbed = None
@@ -142,6 +165,97 @@ class TestChip(ABC):
         else:
             self._logger.warn("No MBED Port. Not using MBED in Testchip") 
         self._initialise()
+
+    @property
+    def adp_sock(self):
+        """Returns the ADP Socket object for reading and writing directly via the ADP connection
+        
+        :return: The ADP Socket object
+        :rtype: adp_socket.ADP_Conn object
+        """
+        return self._adp_sock
+
+    @property
+    def ctrl_regs(self):
+        """Returns the object for reading and writing to/from the M0N0 Control Registers
+        
+        :return: The Control Register object
+        :rtype: registers_model.Registers_Model object
+        """
+        return self._ctrl_regs
+
+    @property
+    def status_regs(self):
+        """Returns the object for reading and writing to/from the M0N0 Status Registers
+        
+        :return: The Status Register object
+        :rtype: registers_model.Registers_Model object
+        """
+        return self._status_regs
+
+    @property
+    def gpio_regs(self):
+        """Returns the object for reading and writing to/from the M0N0 GPIO Registers
+        
+        :return: The GPIO Register object
+        :rtype: registers_model.Registers_Model object
+        """
+        return self._gpio_regs
+
+    @property
+    def spi_regs(self):
+        """Returns the object for reading and writing to/from the M0N0 SPI Registers
+        
+        :return: The SPI Register object
+        :rtype: registers_model.Registers_Model object
+        """
+        return self._spi_regs
+
+    @property
+    def pcsm_regs(self):
+        """Returns the object for reading and writing to/from the M0N0 PCSM Registers
+        
+        :return: The PCSM Register object
+        :rtype: registers_model.Registers_Model object
+        """
+        return self._pcsm_regs
+
+    @property
+    def pcsm(self):
+        """ Alias for pcsm_regs property
+        """
+        return self._pcsm_regs
+
+
+
+    @property
+    def mem_map(self):
+        """Returns the object for reading information about the memory map (e.g. base address or size)
+        
+        :return: The Memory Map object
+        :rtype: registers_model.MemoryMap object
+        """
+        return self._mem_map
+
+    @property
+    def tcs(self):
+        """Returns the object for working with the database of testcases in the ROM/DEVRAM/CODERAM software
+        
+        :return: The Testcases object
+        :rtype: testcase_control.TestcaseController object
+        """
+        return self._tcs
+
+    @property
+    def perf_labels(self):
+        """Returns the perf labels list (e.g. min, high, max etc.)
+        
+        :return: A list of the perf lables strings
+        :rtype: list
+        """
+        return self._perf_labels
+
+
 
     def load_trim_settings(self, load_trims):
         """Loads the trim for the current chip using the specified YAML trim database and chip ID. 
@@ -162,20 +276,20 @@ class TestChip(ABC):
                 else:
                     for k,v in trim_db[self._chip_id][key].items():
                         if isinstance(v, int):
-                            self._logger.info("Sending trim: self.pcsm.write"
+                            self._logger.info("Sending trim: self._pcsm_regs.write"
                                               "({},{})".format(k,v))
-                            self.pcsm.write(k,v)
+                            self._pcsm_regs.write(k,v)
                         else:
                             for k2,v2 in v.items():
                                 if not isinstance(v2,int):
                                     raise("Expected int: {} {} {}".format(
                                             v,v2,k2))
                                 else:
-                                    self._logger.info("Sending trim: self.pcsm"
+                                    self._logger.info("Sending trim: self._pcsm_regs"
                                                       ".write({},{},bit_group"
                                                       "={})".format(
                                                             k,v2,k2))
-                                    self.pcsm.write(k,v2,bit_group=k2)
+                                    self._pcsm_regs.write(k,v2,bit_group=k2)
         else:
             self._logger.error("No trim values for this chip"
                                " ({:03d})".format(self._chip_id))
@@ -200,24 +314,25 @@ class TestChip(ABC):
         # ADP Connection
         self._adp_port = adp_port
         self._logger.info("Setting up ADP")
-        self.adp_sock = adp_socket.ADP_Conn(
-                logger=self._logger
+        self._adp_sock = adp_socket.ADP_Conn(
+                logger=self._logger,
+                logfile_name=self._chip_name
                 ) 
         self._logger.debug("Opening ADP Socket")
-        self.adp_sock.open(adp_port, print_received=False) 
+        self._adp_sock.open(adp_port, print_received=False) 
         # add ADP drivers (overriding DUMMY drivers where appropriate)
-        self.ctrl_regs.set_read_driver(self.adp_sock.memory_read)
-        self.ctrl_regs.set_write_driver(self.adp_sock.memory_write)
-        self.status_regs.set_read_driver(self.adp_sock.memory_read)
-        self.status_regs.set_write_driver(self.adp_sock.memory_write)
-        self.gpio_regs.set_read_driver(self.adp_sock.memory_read)
-        self.gpio_regs.set_write_driver(self.adp_sock.memory_write)
-        self.spi.set_read_driver(self.adp_sock.memory_read)
-        self.spi.set_write_driver(self.adp_sock.memory_write)
-        self.pcsm.set_write_driver(self._adp_to_pcsm_write)
+        self._ctrl_regs.set_read_driver(self._adp_sock.memory_read)
+        self._ctrl_regs.set_write_driver(self._adp_sock.memory_write)
+        self._status_regs.set_read_driver(self._adp_sock.memory_read)
+        self._status_regs.set_write_driver(self._adp_sock.memory_write)
+        self._gpio_regs.set_read_driver(self._adp_sock.memory_read)
+        self._gpio_regs.set_write_driver(self._adp_sock.memory_write)
+        self._spi_regs.set_read_driver(self._adp_sock.memory_read)
+        self._spi_regs.set_write_driver(self._adp_sock.memory_write)
+        self._pcsm_regs.set_write_driver(self._adp_to_pcsm_write)
         if safe_tcro:  # unused
             temp_perf = self.get_perf()
-            self.pcsm.write('tcro_ctrl', 0xFC)
+            self._pcsm_regs.write('tcro_ctrl', 0xFC)
             if (temp_perf == 31):
                 self.set_perf(25)
             else:
@@ -248,14 +363,14 @@ class TestChip(ABC):
                     self._load_devram,
                     skip_reload=skip_reload)
             if res['testcase_list']:
-                self.tcs = tc_lib.TestcaseController(
+                self._tcs = tc_lib.TestcaseController(
                         res['testcase_list'],
-                        self.adp_sock,
-                        self.ctrl_regs,
+                        self._adp_sock,
+                        self._ctrl_regs,
                         logger=self._logger,
                         tcs_to_run_path=self._tcs_to_run_path)
             else:
-                self.tcs = None 
+                self._tcs = None 
                 self._logger.warn("No testcase db, cannot run testcases")
         else:
             self._logger.warn("No sw directory, cannot load or use tcs")
@@ -267,8 +382,8 @@ class TestChip(ABC):
     def exit(self): 
         """ Cleanly closes the chip (closing ports and read threads)
         """
-        if self.adp_sock:
-            self.adp_sock.close()
+        if self._adp_sock:
+            self._adp_sock.close()
         if self.mbed:
             self.mbed.close()
         self._logger.info("Chip Exited")
@@ -323,19 +438,19 @@ class TestChip(ABC):
         """Remaps the memory map so that instructions are executed from ROM
         """
         self._logger.info("Remapping to ROM")
-        self.pcsm.write('code_ctrl', 0, bit_group='memory_remap')
+        self._pcsm_regs.write('code_ctrl', 0, bit_group='memory_remap')
 
     def remap_to_devram(self):
         """Remaps the memory map so that instructions are executed from DEVRAM
         """
         self._logger.info("Remapping to DEVRAM")
-        self.pcsm.write('code_ctrl', 1, bit_group='memory_remap')
+        self._pcsm_regs.write('code_ctrl', 1, bit_group='memory_remap')
 
     def remap_to_coderam(self):
         """Remaps the memory map so that instructions are executed from CODERAM
         """
         self._logger.info("Remapping to CODERAM")
-        self.pcsm.write('code_ctrl',1,bit_group='memory_remap')
+        self._pcsm_regs.write('code_ctrl',1,bit_group='memory_remap')
 
     def read_memory_region(self, name, words=None, save_to_file=None):
         """ Read content a memory map region
@@ -352,11 +467,11 @@ class TestChip(ABC):
         :return: Returns a list of data words (as ints)
         :rtype: list
         """
-        base = self.mem_map.get_base(name)
-        size = self.mem_map.get_size(name)
+        base = self._mem_map.get_base(name)
+        size = self._mem_map.get_size(name)
         start = time.time()
         number_of_words = (words if words else int(size/4))
-        mem_words = self.adp_sock.memory_read_batch_fast(base, number_of_words)
+        mem_words = self._adp_sock.memory_read_batch_fast(base, number_of_words)
         self._logger.info("Read 0x{:08X} words ({:d} bytes) in "
                           "{:0.2f} seconds".format(
                                   number_of_words,
@@ -383,16 +498,16 @@ class TestChip(ABC):
         # Hold reset
         self.reset_hold()
         # Write devram code
-        temp_base = self.mem_map.get_base('DEVRAM')
-        temp_size = self.mem_map.get_size('DEVRAM')
+        temp_base = self._mem_map.get_base('DEVRAM')
+        temp_size = self._mem_map.get_size('DEVRAM')
         # measure and report time to upload, binary can be up to 6x faster
         start = time.time()
         if code_path.endswith('.bin') :
             self._logger.info("Writing binary file")
-            self.adp_sock.memory_dump_bin(code_path, temp_base, temp_size)
+            self._adp_sock.memory_dump_bin(code_path, temp_base, temp_size)
         else:
             self._logger.info("Writing hex file")
-            self.adp_sock.memory_dump(code_path, temp_base, temp_size)
+            self._adp_sock.memory_dump(code_path, temp_base, temp_size)
         end = time.time()
         self._logger.info("Write time: {:0.2f} seconds".format(end-start))
         if code_path.endswith('.hex32') :
@@ -410,7 +525,7 @@ class TestChip(ABC):
                 devram_lines = []
                 start = time.time()
                 devram_lines = [x.lower() for x in 
-                        self.adp_sock.memory_read_batch(
+                        self._adp_sock.memory_read_batch(
                                 temp_base, check_lines).split()]
                 self._logger.info("Read 0x{:08X} words ({:d} bytes) in "
                                   "{:0.2f} seconds".format(
@@ -457,6 +572,7 @@ class TestChip(ABC):
         """
         pass
 
+    @staticmethod
     @abstractmethod
     def setup_chip(params, logger, chip=None, skip_reload=False):
         """ A non-member utility function for setting up the chip with command-line options
@@ -506,6 +622,7 @@ class M0N0S2(TestChip):
     @property
     def ordered_perfs(self):
         """Returns a list of perfs (HW IDs) in order (lowest TCRO frequency to highests)
+
         :return: List of integers of the perf (DVFS) HW ID
         :rtype: list
         """
@@ -539,7 +656,7 @@ class M0N0S2(TestChip):
         """
         if isinstance(perf, (str)):
             perf = self._perf_label_lookup[perf]
-        return self.pcsm.get_value_table('perf_ctrl','perf')[perf]
+        return self._pcsm_regs.get_value_table('perf_ctrl','perf')[perf]
 
     def set_perf(self, perf):
         """Sets the current perf (DVFS level) of the chip
@@ -550,12 +667,12 @@ class M0N0S2(TestChip):
         """
         self._logger.info("Setting perf to: {}".format(perf))
         if isinstance(perf, (int)):
-            self.pcsm.write(
+            self._pcsm_regs.write(
                     'perf_ctrl',
                     perf,
                     bit_group='perf')     
         elif isinstance(perf, (str)):
-            self.pcsm.write(
+            self._pcsm_regs.write(
                     'perf_ctrl',
                     self._perf_label_lookup[perf],
                     bit_group='perf')     
@@ -568,7 +685,7 @@ class M0N0S2(TestChip):
         :return: The current perf (HW ID)
         :rtype: int
         """
-        return self.status_regs.read('STATUS_7',bit_group="perf")
+        return self._status_regs.read('STATUS_7',bit_group="perf")
 
     def set_dvfs(self, level):
         """Sets the current perf (DVFS level) using the perf ID (0-15)
@@ -581,7 +698,7 @@ class M0N0S2(TestChip):
         perf = self.ordered_perfs[level]
         self._logger.info("Setting DVFS level to {} (HW ID: {})".format(
                 level, perf))
-        self.pcsm.write(
+        self._pcsm_regs.write(
                 'perf_ctrl',
                 perf,
                 bit_group='perf')     
@@ -593,7 +710,7 @@ class M0N0S2(TestChip):
         :rtype: int
         """
         return self.ordered_perfs.index(
-                self.status_regs.read('STATUS_7',bit_group="perf"))
+                self._status_regs.read('STATUS_7',bit_group="perf"))
 
     def get_rtc(self, unit=None):
         """Reads the current RTC counter value
@@ -605,8 +722,8 @@ class M0N0S2(TestChip):
         :return: The RTC ticks (int) or time in the specified units (float)
         :rtype: int or float
         """
-        lsbs = self.status_regs.read('STATUS_2')
-        msbs = self.status_regs.read('STATUS_4',bit_group="rtc_msbs")
+        lsbs = self._status_regs.read('STATUS_2')
+        msbs = self._status_regs.read('STATUS_4',bit_group="rtc_msbs")
         val = lsbs | (msbs << 32)
         if not unit:
             return val
@@ -626,13 +743,13 @@ class M0N0S2(TestChip):
         
         :rtype: int
         """
-        res = self.adp_sock.memory_read(0xE000ED28)
+        res = self._adp_sock.memory_read(0xE000ED28)
         return res
 
     def power_off_roms():
         """Powers off the ROM banks (which switch on automatically as required)
         """
-        self.ctrl_regs.write("CTRL_2", 0)
+        self._ctrl_regs.write("CTRL_2", 0)
 
     def get_results(self):
         """Returns an ordered dict of key current system variables for logging to a results file
@@ -645,9 +762,9 @@ class M0N0S2(TestChip):
         d['adp_port'] = self._adp_port
         d['mbed_port'] = self._adp_port
         d['sw_directory'] = self._sw_directory
-        d['in_reset'] = True if self.ctrl_regs.read('CTRL_0',
+        d['in_reset'] = True if self._ctrl_regs.read('CTRL_0',
                             bit_group='master_reset') else False
-        remap =  self.status_regs.read('STATUS_7', bit_group='memory_remap')
+        remap =  self._status_regs.read('STATUS_7', bit_group='memory_remap')
         if remap == 0:
             d['remap_to'] = "ROM"
         elif remap == 1:
@@ -656,21 +773,21 @@ class M0N0S2(TestChip):
             d['remap_to'] = "CODERAM"
         else:
             raise ValueError("Invalid Memory Remap")
-        d['deve_core'] = self.status_regs.read(
+        d['deve_core'] = self._status_regs.read(
                 'STATUS_7', bit_group='deve_core')
-        d['perf_modelled'] = self.pcsm.read_model(
+        d['perf_modelled'] = self._pcsm_regs.read_model(
                 'perf_ctrl', bit_group='perf')['val']
-        d['perf'] = self.status_regs.read('STATUS_7',bit_group='perf')
+        d['perf'] = self._status_regs.read('STATUS_7',bit_group='perf')
         perf_label = 'NA'
         if int(d['perf']) in self._perf_label_lookup.values():
             for name, level in self._perf_label_lookup.items():
                 if level == d['perf']:
                     perf_label = name
                     break
-        d['ctrl_2_dump'] = self.ctrl_regs.read('CTRL_2')
-        d['ctrl_4_dump'] = self.ctrl_regs.read('CTRL_4')
-        d['status_3_dump'] = self.status_regs.read('STATUS_3')
-        d['status_7_dump'] = self.status_regs.read('STATUS_7')
+        d['ctrl_2_dump'] = self._ctrl_regs.read('CTRL_2')
+        d['ctrl_4_dump'] = self._ctrl_regs.read('CTRL_4')
+        d['status_3_dump'] = self._status_regs.read('STATUS_3')
+        d['status_7_dump'] = self._status_regs.read('STATUS_7')
         if self.mbed: 
             d.update({
                 'mbed_vreg' : self.mbed.read_vreg(),
@@ -688,15 +805,15 @@ class M0N0S2(TestChip):
                 "NA" if not self._chip_id else "{:03d}".format(self._chip_id))
         res += "\nADP Connected: {}\nMBED Connected: {}".format(
             ("YES ("+self._adp_port+")") if 
-                    (self.adp_sock and self._adp_port) else "NO",
+                    (self._adp_sock and self._adp_port) else "NO",
             ("YES ("+self._mbed_port+")") 
                     if (self.mbed and self._mbed_port) else "NO")
-        if self.adp_sock:
+        if self._adp_sock:
             res += "\nIn Reset: {}".format(
-                    "YES" if self.ctrl_regs.read('CTRL_0',
+                    "YES" if self._ctrl_regs.read('CTRL_0',
                             bit_group='master_reset') else
                     "NO")
-            remap =  self.status_regs.read('STATUS_7', bit_group='memory_remap')
+            remap =  self._status_regs.read('STATUS_7', bit_group='memory_remap')
             res += "\nMemory base mapped to "
             if remap == 0:
                 res += "ROM"
@@ -707,6 +824,7 @@ class M0N0S2(TestChip):
             else:
                 raise ValueError("Invalid Memory Remap")
             perf = self.get_perf()
+            dvfs = self.get_dvfs()
             perf_label = None
             if int(perf) in self._perf_label_lookup.values():
                 for name, level in self._perf_label_lookup.items():
@@ -714,10 +832,11 @@ class M0N0S2(TestChip):
                         perf_label = name 
                         break 
             res += "\nDEVE: {}".format(
-                    self.status_regs.read('STATUS_7', bit_group='deve_core'))
-            res += "\nCurrent perf: {}{}".format(
-                    perf,
-                    " ("+perf_label+")" if perf_label else "")
+                    self._status_regs.read('STATUS_7', bit_group='deve_core'))
+            res += "\nCurrent DVFS: {}{} (HW ID: {})".format(
+                    dvfs,
+                    " ("+perf_label+")" if perf_label else "",
+                    perf)
             res += "\nSoftware: {}".format(
                 "None" if not self._sw_directory else self._sw_directory)
         return res
@@ -727,23 +846,23 @@ class M0N0S2(TestChip):
         """
         self._logger.info("Reading ctrl_regs for sanity...")
         res = "CTRL_REG:\n0x0: 0x{:08X}\n0x1: 0x{:08X}\n0x2: 0x{:08X}\n".format(
-            self.ctrl_regs.read(0),
-            self.ctrl_regs.read(1),
-            self.ctrl_regs.read(2))
+            self._ctrl_regs.read(0),
+            self._ctrl_regs.read(1),
+            self._ctrl_regs.read(2))
         res += "0x3: 0x{:08X}\n0x4: 0x{:08X}\n0x5: 0x{:08X}\n".format(
-            self.ctrl_regs.read(3),
-            self.ctrl_regs.read(4),
-            self.ctrl_regs.read(5))
+            self._ctrl_regs.read(3),
+            self._ctrl_regs.read(4),
+            self._ctrl_regs.read(5))
         self._logger.info("Reading status_regs for sanity...")
         res += "STATUS_REG:\n0x0: 0x{:08X}\n0x1: 0x{:08X}\n0x2: 0x{:08X}\n".format(
-            self.status_regs.read(0),
-            self.status_regs.read(1),
-            self.status_regs.read(2))
+            self._status_regs.read(0),
+            self._status_regs.read(1),
+            self._status_regs.read(2))
         res += "0x3: 0x{:08X}\n0x4: 0x{:08X}\n0x5: 0x{:08X}\n0x7: 0x{:08X}".format(
-            self.status_regs.read(3),
-            self.status_regs.read(4),
-            self.status_regs.read(5),
-            self.status_regs.read(7))
+            self._status_regs.read(3),
+            self._status_regs.read(4),
+            self._status_regs.read(5),
+            self._status_regs.read(7))
         return res
 
     def _initialise(self):
@@ -763,29 +882,29 @@ class M0N0S2(TestChip):
                 'registers_models','M0N0S2','control.regs.yaml'])
         status_reg_path = os.path.join(*[
                 'registers_models','M0N0S2','status.regs.yaml'])
-        self.mem_map = mem_map_lib.MemoryMap(mem_map_path,logger=self._logger)
+        self._mem_map = mem_map_lib.MemoryMap(mem_map_path,logger=self._logger)
         self._logger.info("Setting up register models")
-        self.spi = registers_model.Registers_Model(spi_reg_path,logger=self._logger)
-        self.spi.set_read_driver(self._dummy_drivers.dummy_read)
-        self.spi.set_write_driver(self._dummy_drivers.dummy_write)
-        self.pcsm = registers_model.Registers_Model(
+        self._spi_regs = registers_model.Registers_Model(spi_reg_path,logger=self._logger)
+        self._spi_regs.set_read_driver(self._dummy_drivers.dummy_read)
+        self._spi_regs.set_write_driver(self._dummy_drivers.dummy_write)
+        self._pcsm_regs = registers_model.Registers_Model(
                 pcsm_reg_path,
                 logger=self._logger)
-        self.pcsm.set_write_driver(self._dummy_drivers.dummy_write)
-        self.ctrl_regs = registers_model.Registers_Model(
+        self._pcsm_regs.set_write_driver(self._dummy_drivers.dummy_write)
+        self._ctrl_regs = registers_model.Registers_Model(
                 ctrl_reg_path,
                 logger=self._logger)
-        self.ctrl_regs.set_read_driver(self._dummy_drivers.dummy_read)
-        self.ctrl_regs.set_write_driver(self._dummy_drivers.dummy_write)
-        self.status_regs = registers_model.Registers_Model(
+        self._ctrl_regs.set_read_driver(self._dummy_drivers.dummy_read)
+        self._ctrl_regs.set_write_driver(self._dummy_drivers.dummy_write)
+        self._status_regs = registers_model.Registers_Model(
                 status_reg_path,
                 logger=self._logger)
-        self.status_regs.set_read_driver(self._dummy_drivers.dummy_read)
-        self.gpio_regs = registers_model.Registers_Model(
+        self._status_regs.set_read_driver(self._dummy_drivers.dummy_read)
+        self._gpio_regs = registers_model.Registers_Model(
                 gpio_reg_path,
                 logger=self._logger)
-        self.gpio_regs.set_read_driver(self._dummy_drivers.dummy_read)
-        self.gpio_regs.set_write_driver(self._dummy_drivers.dummy_write)
+        self._gpio_regs.set_read_driver(self._dummy_drivers.dummy_read)
+        self._gpio_regs.set_write_driver(self._dummy_drivers.dummy_write)
     
     def set_adp_tx_callbacks(self, callbacks):
         """Set callbacks functions for ADP transaction protocol. 
@@ -795,18 +914,18 @@ class M0N0S2(TestChip):
                           when a transaction of that name is received. 
         :type callbacks: dict
         """
-        self.adp_sock.set_adp_tx_callbacks(callbacks)
+        self._adp_sock.set_adp_tx_callbacks(callbacks)
 
     def reset_hold(self):
         """Holds the chip in reset
         """
-        self.ctrl_regs.write_set('CTRL_0',0x1)
+        self._ctrl_regs.write_set('CTRL_0',0x1)
         self._logger.info("Reset held")
 
     def reset_release(self):
         """Releases the chip reset reset
         """
-        self.ctrl_regs.write_clear('CTRL_0',0x1)
+        self._ctrl_regs.write_clear('CTRL_0',0x1)
         self._logger.info("Reset released")
 
     def _spi_write_through_adp(self,data):
@@ -815,10 +934,10 @@ class M0N0S2(TestChip):
         :param data: data to send via SPI
         :type data: int
         """
-        self.spi.write("data_write", data,read_device=True)
-        self.spi.write("command", 0x1, read_device=True)
+        self._spi_regs.write("data_write", data,read_device=True)
+        self._spi_regs.write("command", 0x1, read_device=True)
         start = time.time()
-        while (self.spi.read("status") == 1):
+        while (self._spi_regs.read("status") == 1):
             if (time.time() - start) > 2:
                 raise SpiTimeoutError("SPI transaction timed out")
             continue
@@ -847,8 +966,8 @@ class M0N0S2(TestChip):
                                    byte3
                                    ))
         # Save SPI control setting for restoring
-        initial_spi_ctrl = self.spi.read("control")
-        self.spi.write("control", 0xC0)
+        initial_spi_ctrl = self._spi_regs.read("control")
+        self._spi_regs.write("control", 0xC0)
         # Write to PCSM
         self._spi_write_through_adp(address)
         # next three bytes are 24b control register
@@ -857,7 +976,7 @@ class M0N0S2(TestChip):
         self._spi_write_through_adp(byte2)
         self._spi_write_through_adp(byte3)
         # Restore SPI control settings
-        self.spi.write("control",initial_spi_ctrl)
+        self._spi_regs.write("control",initial_spi_ctrl)
     
     def measure_rtc(self, time_period_s=5):
         """Measures the RTC frequency and error from target 33 kHz frequency
@@ -902,16 +1021,16 @@ class M0N0S2(TestChip):
         self._logger.info("RTC ticks: {:d}".format(rtc_ticks))
         # 2. set the RTC wakeup PCSM register
         msbs = (rtc_ticks>>24)&0x00FFFFFF;
-        self.pcsm.write('rtc_wkup1', msbs)
+        self._pcsm_regs.write('rtc_wkup1', msbs)
         lsbs = (rtc_ticks)&0x00FFFFFF;
-        self.pcsm.write('rtc_wkup0', lsbs)
+        self._pcsm_regs.write('rtc_wkup0', lsbs)
         # 3. set deep sleep
         print("msbs: 0x{:0X}, lsbs: 0x{:0X}".format(msbs, lsbs))
-        self.tcs.run_testcase("EN_D_SLEEP", wait_for_output=True)
+        self._tcs.run_testcase("EN_D_SLEEP", wait_for_output=True)
         rtc_s_before = self.get_rtc(unit='s')
         py_s_before = time.time()
         # 4. Call WFI
-        res = self.tcs.run_testcase(
+        res = self._tcs.run_testcase(
                 "CALL_WFI",
                 wait_for_output="<S><t><a><r><t><i><n><g>",
                 timeout=time_ms*1000*10)
@@ -975,14 +1094,14 @@ class M0N0S2(TestChip):
         :type recursion_depth: int
         """
         self._logger.info("Enabling RTC Forward Body Bias (FBB)")
-        self.pcsm.write('rtc_ctrl1', 1, bit_group='en_fbb')
-        current_rtc_trim = self.pcsm.read(
+        self._pcsm_regs.write('rtc_ctrl1', 1, bit_group='en_fbb')
+        current_rtc_trim = self._pcsm_regs.read(
                 'rtc_ctrl0',bit_group='trim_res_tune')
         self._logger.info("Starting RTC trim value: 0x{:08X}".format(current_rtc_trim))
         def rtc_trim_inner(trim_val, args):
             args['logger'].info("rtc_trim_inner")
             # Setting the trim
-            self.pcsm.write('rtc_ctrl0', trim_val, bit_group='trim_res_tune')
+            self._pcsm_regs.write('rtc_ctrl0', trim_val, bit_group='trim_res_tune')
             # read the RTC
             self._logger.info("New Trim: 0x{:08X}".format(
                     trim_val))
@@ -1016,14 +1135,14 @@ class M0N0S2(TestChip):
         """
         raise NotImplementedError("Requires testing")
         self._logger.info("Enabling RTC Forward Body Bias (FBB)")
-        self.pcsm.write('rtc_ctrl1', 1, bit_group='en_fbb')
-        current_rtc_trim = self.pcsm.read(
+        self._pcsm_regs.write('rtc_ctrl1', 1, bit_group='en_fbb')
+        current_rtc_trim = self._pcsm_regs.read(
                 'rtc_ctrl0',bit_group='trim_res_tune')
         self._logger.info("Starting RTC trim value: 0x{:08X}".format(current_rtc_trim))
         def rtc_trim_inner(trim_val, args):
             args['logger'].info("rtc_trim_inner")
             # Setting the trim
-            self.pcsm.write('rtc_ctrl0', trim_val, bit_group='trim_res_tune')
+            self._pcsm_regs.write('rtc_ctrl0', trim_val, bit_group='trim_res_tune')
             # read the RTC
             self._logger.info("New Trim: 0x{:08X}".format(
                     trim_val))
@@ -1045,6 +1164,7 @@ class M0N0S2(TestChip):
                 args,
                 is_int=True)
      
+    @staticmethod
     def setup_chip(params, logger, chip=None, skip_reload=False):
         """Creates a M0N0S2 chip instance using the parameters (includes command line options).
 
@@ -1070,13 +1190,16 @@ class M0N0S2(TestChip):
             params['mbed_port'] = None
         if 'tcs_to_run_file' not in params:
             params['tcs_to_run_file'] = None
+        if 'chip_name' not in params:
+            params['chip_name'] = None
         chip = M0N0S2(
                 logger=logger,
                 mbed_port=params['mbed_port'],
                 sw_directory=params['software'],
                 load_devram=params['load_devram'],
                 chip_id=int(params['chip_id']),
-                tcs_to_run_path=params['tcs_to_run_file'])
+                tcs_to_run_path=params['tcs_to_run_file'],
+                chip_name = params['chip_name'])
         if chip.mbed:
             chip.mbed.external_wake()
         else:
